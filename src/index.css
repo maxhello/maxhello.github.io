@@ -1,0 +1,113 @@
+@import "tailwindcss";
+
+html {
+  scroll-behavior: smooth;
+  color-scheme: dark;
+}
+
+/* ── 极光背景:两层渐变光斑缓慢漂移 ─────────────────── */
+.aurora-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  overflow: hidden;
+  background: #030712;
+}
+
+.aurora-bg::before,
+.aurora-bg::after {
+  content: '';
+  position: absolute;
+  width: 60vmax;
+  height: 60vmax;
+  border-radius: 50%;
+  filter: blur(100px);
+  opacity: 0.16;
+  will-change: transform;
+}
+
+.aurora-bg::before {
+  top: -20vmax;
+  left: -15vmax;
+  background: radial-gradient(circle, #22d3ee, transparent 60%);
+  animation: drift1 24s ease-in-out infinite alternate;
+}
+
+.aurora-bg::after {
+  bottom: -25vmax;
+  right: -15vmax;
+  background: radial-gradient(circle, #8b5cf6, transparent 60%);
+  animation: drift2 30s ease-in-out infinite alternate;
+}
+
+@keyframes drift1 {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(18vw, 12vh) scale(1.25); }
+}
+
+@keyframes drift2 {
+  from { transform: translate(0, 0) scale(1.1); }
+  to   { transform: translate(-14vw, -10vh) scale(0.9); }
+}
+
+/* ── 网格叠加层:极淡的科技感网格,随滚动轻微视差 ── */
+.grid-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.05) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, black 30%, transparent 75%);
+}
+
+/* ── 渐变文字 ─────────────────────────────────────── */
+.text-gradient {
+  background: linear-gradient(135deg, #67e8f9 0%, #60a5fa 45%, #a78bfa 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ── 入场动画 ─────────────────────────────────────── */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.fade-up {
+  animation: fade-up 0.6s ease-out both;
+}
+
+/* 尊重减弱动效偏好 */
+@media (prefers-reduced-motion: reduce) {
+  .aurora-bg::before,
+  .aurora-bg::after,
+  .fade-up {
+    animation: none;
+  }
+}
+
+/* ── 滚动条 ───────────────────────────────────────── */
+::-webkit-scrollbar { width: 10px; }
+::-webkit-scrollbar-track { background: #030712; }
+::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 8px;
+  border: 2px solid #030712;
+}
+::-webkit-scrollbar-thumb:hover { background: #334155; }
+
+/* ── 选中文本 ─────────────────────────────────────── */
+::selection {
+  background: rgba(34, 211, 238, 0.3);
+  color: #f0fdff;
+}
+
+/* ── 代码高亮(暗色基底) ──────────────────────────── */
+.hljs {
+  color: #e6edf3;
+  background: transparent;
+}
