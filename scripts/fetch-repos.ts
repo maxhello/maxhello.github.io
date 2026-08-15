@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const OUT = join(__dirname, '../src/data/repos.json')
 // 用户名可用环境变量 GITHUB_USER 覆盖,默认与线上一致(见 src/site.config.ts)
-const USER = process.env.GITHUB_USER || 'maxzhangdev'
+const USER = process.env.GITHUB_USER || 'maxhello'
 
 interface Repo {
   id: number
@@ -26,7 +26,7 @@ interface Repo {
   pushed_at: string
 }
 
-const pinnedRepos = ['maxzhangdev.github.io']
+const pinnedRepos = ['maxhello.github.io']
 
 async function main() {
   const headers: Record<string, string> = {
