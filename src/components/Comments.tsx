@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { site } from '../site.config'
 
 /**
  * giscus 评论(基于 GitHub Discussions)。
@@ -15,10 +16,10 @@ function Giscus() {
     script.src = 'https://giscus.app/client.js'
     script.async = true
     script.crossOrigin = 'anonymous'
-    script.setAttribute('data-repo', 'zhanghongzheng6/zhanghongzheng6.github.io')
-    script.setAttribute('data-repo-id', 'R_kgDORrItCQ')
-    script.setAttribute('data-category', 'Announcements')
-    script.setAttribute('data-category-id', 'DIC_kwDORrItCc4DDaPd')
+    script.setAttribute('data-repo', `${site.githubUser}/${site.siteRepo}`)
+    script.setAttribute('data-repo-id', site.giscus.repoId)
+    script.setAttribute('data-category', site.giscus.category)
+    script.setAttribute('data-category-id', site.giscus.categoryId)
     script.setAttribute('data-mapping', 'pathname')
     script.setAttribute('data-strict', '0')
     script.setAttribute('data-reactions-enabled', '1')

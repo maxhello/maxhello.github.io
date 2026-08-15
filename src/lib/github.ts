@@ -1,3 +1,5 @@
+import { site } from '../site.config'
+
 export interface Repo {
   id: number
   name: string
@@ -29,8 +31,8 @@ export const languageColors: Record<string, string> = {
   MDX: '#fcb32c',
 }
 
-// 固定项目:优先展示,不受 API 影响
-export const pinnedRepos = ['zhanghongzheng6.github.io']
+// 固定项目:优先展示,不受 API 影响(配置见 site.config.ts)
+export const pinnedRepos = site.pinnedRepos
 
 // 构建时由 scripts/fetch-repos.ts 生成的静态数据
 // (开发时若不存在,fallback 到浏览器实时拉取)

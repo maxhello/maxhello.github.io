@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { posts } from '../lib/posts'
+import { githubProfileUrl } from '../site.config'
 import { useInView } from '../hooks/useInView'
 import {
   CardRouterLink,
@@ -55,7 +56,7 @@ export default function Home() {
           </div>
           <div className="fade-up fade-up-delay-4 mt-9 flex gap-4">
             <a
-              href="https://github.com/zhanghongzheng6"
+              href={githubProfileUrl}
               target="_blank"
               rel="noreferrer"
               className="btn-primary"
@@ -133,7 +134,7 @@ export default function Home() {
           <p className="mt-5 text-gray-400">
             Find me on{' '}
             <a
-              href="https://github.com/zhanghongzheng6"
+              href={githubProfileUrl}
               target="_blank"
               rel="noreferrer"
               className="link-underline text-cyan-400"
