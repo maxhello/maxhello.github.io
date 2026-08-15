@@ -7,6 +7,11 @@
     "learningLanguage": "en",
     "date": "2026-08-15",
     "daily": {
+      "2026-07-31": {
+        "lessons": 2,
+        "minutes": 7,
+        "xp": 63
+      },
       "2026-08-01": {
         "lessons": 6,
         "minutes": 25,

@@ -137,6 +137,18 @@ def main():
     history = []
     if OUT.exists():
         history = json.loads(OUT.read_text())
+
+    # 合并历史 daily:接口只返回最近窗口,旧快照里已存的天数不能丢。
+    # 规则:新拉到的天覆盖同日旧值,窗口外的旧天保留。
+    merged_daily: dict = {}
+    for old in history:
+        for d, v in (old.get("daily") or {}).items():
+            merged_daily[d] = v
+    for d, v in (snapshot.get("daily") or {}).items():
+        merged_daily[d] = v
+    if merged_daily:
+        snapshot["daily"] = dict(sorted(merged_daily.items()))
+
     # 同一天重跑覆盖;保持日期升序
     history = [h for h in history if h["date"] != today]
     history.append(snapshot)
