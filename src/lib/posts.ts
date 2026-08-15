@@ -1,4 +1,5 @@
 // 博客文章加载:content/posts/*.mdx 通过 Vite 的 import.meta.glob 静态收集
+// MDX 编译后:正文组件是 default export,元数据是具名 export frontmatter
 export interface PostMeta {
   slug: string
   title: string
@@ -7,8 +8,8 @@ export interface PostMeta {
   excerpt?: string
 }
 
-export interface PostModule {
-  Content: () => React.ReactElement
+interface RawPostModule {
+  default: () => React.ReactElement
   frontmatter: {
     title: string
     date: string
@@ -17,7 +18,12 @@ export interface PostModule {
   }
 }
 
-const modules = import.meta.glob<PostModule>('../../content/posts/*.mdx', {
+export interface PostModule {
+  Content: () => React.ReactElement
+  frontmatter: RawPostModule['frontmatter']
+}
+
+const modules = import.meta.glob<RawPostModule>('../../content/posts/*.mdx', {
   eager: true,
 })
 
@@ -34,13 +40,5 @@ export const posts: PostMeta[] = Object.entries(modules)
 export function getPost(slug: string): PostModule | undefined {
   const mod = modules[`../../content/posts/${slug}.mdx`]
   if (!mod) return undefined
-  return {
-    ...mod,
-    frontmatter: {
-      title: mod.frontmatter.title,
-      date: mod.frontmatter.date,
-      tags: mod.frontmatter.tags ?? [],
-      excerpt: mod.frontmatter.excerpt,
-    },
-  }
+  return { Content: mod.default, frontmatter: mod.frontmatter }
 }

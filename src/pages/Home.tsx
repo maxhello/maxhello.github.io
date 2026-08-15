@@ -1,83 +1,149 @@
 import { Link } from 'react-router-dom'
 import { posts } from '../lib/posts'
+import { useInView } from '../hooks/useInView'
+import {
+  CardRouterLink,
+  NumberedSection,
+  Tag,
+} from '../components/ui'
 
 const stacks = ['Backend', 'Systems', 'AI / ML', 'Go', 'Python']
+
+/** 滚动 reveal 包装:进入视口后加 .is-visible */
+function Reveal({
+  children,
+  delay = 0,
+}: {
+  children: React.ReactNode
+  delay?: number
+}) {
+  const { ref, inView } = useInView<HTMLDivElement>()
+  return (
+    <div
+      ref={ref}
+      className={`reveal ${inView ? 'is-visible' : ''}`}
+      style={delay ? { transitionDelay: `${delay}ms` } : undefined}
+    >
+      {children}
+    </div>
+  )
+}
 
 export default function Home() {
   const latest = posts.slice(0, 3)
 
   return (
-    <div className="space-y-14">
-      {/* Hero */}
-      <section className="pt-10 text-center">
-        <p className="mb-4 font-mono text-sm text-cyan-400">
-          $ whoami
-        </p>
-        <h1 className="text-gradient text-5xl font-bold tracking-tight">
-          Max
-        </h1>
-        <p className="mx-auto mt-5 max-w-xl text-lg text-gray-400">
-          Backend & systems engineer, diving into{' '}
-          <span className="text-cyan-300">AI</span> and{' '}
-          <span className="text-violet-300">machine learning</span>.
-        </p>
-        <div className="mt-7 flex flex-wrap justify-center gap-2">
-          {stacks.map((s) => (
-            <span
-              key={s}
-              className="rounded-full border border-gray-700/80 bg-gray-900/50 px-3 py-1 text-sm text-gray-300 transition-colors hover:border-cyan-400/60 hover:text-cyan-300"
+    <div className="space-y-24">
+      {/* ── Hero:全宽排版层(星空背景由 Layout 全局提供) ── */}
+      <section className="hero-breakout relative flex min-h-[85dvh] items-center">
+        <div className="relative mx-auto w-full max-w-3xl px-4">
+          <p className="fade-up fade-up-delay-1 font-mono text-sm text-cyan-400">
+            Hi, my name is
+          </p>
+          <h1 className="hero-title heading-gradient fade-up fade-up-delay-2 mt-3 font-bold">
+            Max Zhang.
+          </h1>
+          <p className="fade-up fade-up-delay-3 mt-5 max-w-xl text-lg leading-relaxed text-gray-400">
+            I build <span className="text-gray-200">backend systems</span> and
+            explore <span className="text-cyan-300">AI</span> and{' '}
+            <span className="text-violet-300">machine learning</span>.
+          </p>
+          <div className="fade-up fade-up-delay-3 mt-6 flex flex-wrap gap-2">
+            {stacks.map((s) => (
+              <Tag key={s}>{s}</Tag>
+            ))}
+          </div>
+          <div className="fade-up fade-up-delay-4 mt-9 flex gap-4">
+            <a
+              href="https://github.com/zhanghongzheng6"
+              target="_blank"
+              rel="noreferrer"
+              className="btn-primary"
             >
-              {s}
-            </span>
-          ))}
-        </div>
-        <div className="mt-8 flex justify-center gap-4">
-          <a
-            href="https://github.com/zhanghongzheng6"
-            target="_blank"
-            rel="noreferrer"
-            className="rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 px-5 py-2.5 font-medium text-white shadow-[0_0_24px_-6px_rgba(34,211,238,0.6)] transition-all hover:shadow-[0_0_32px_-4px_rgba(34,211,238,0.8)]"
-          >
-            GitHub →
-          </a>
-          <Link
-            to="/blog"
-            className="rounded-lg border border-gray-700 bg-gray-900/50 px-5 py-2.5 font-medium text-gray-200 transition-colors hover:border-violet-400/60 hover:text-violet-300"
-          >
-            Read the blog
-          </Link>
-        </div>
-      </section>
-
-      {/* Latest posts */}
-      {latest.length > 0 && (
-        <section>
-          <div className="mb-5 flex items-center justify-between">
-            <h2 className="text-xl font-bold text-gray-100">Latest Posts</h2>
-            <Link
-              to="/blog"
-              className="text-sm text-cyan-400 hover:text-cyan-300"
-            >
-              All posts →
+              GitHub →
+            </a>
+            <Link to="/blog" className="btn-ghost">
+              Read the blog
             </Link>
           </div>
-          <ul className="space-y-3">
-            {latest.map((p) => (
-              <li key={p.slug}>
-                <Link
+        </div>
+        <a
+          href="#about"
+          aria-label="Scroll down"
+          className="scroll-hint absolute bottom-8 left-1/2 -translate-x-1/2 text-2xl text-gray-500 hover:text-cyan-300"
+        >
+          ↓
+        </a>
+      </section>
+
+      {/* ── 01. About ── */}
+      <section id="about" className="scroll-mt-20">
+        <Reveal>
+          <NumberedSection number="01" title="About Me" />
+        </Reveal>
+        <Reveal delay={120}>
+          <p className="mt-5 max-w-2xl leading-relaxed text-gray-400">
+            I'm Max, a backend / systems engineer who cares about software you
+            can operate — things with health checks, honest logs, and failure
+            modes you can name.{' '}
+            <Link to="/about" className="link-underline text-cyan-400">
+              More about me →
+            </Link>
+          </p>
+        </Reveal>
+      </section>
+
+      {/* ── 02. Latest Posts ── */}
+      {latest.length > 0 && (
+        <section>
+          <Reveal>
+            <NumberedSection number="02" title="Latest Posts" />
+          </Reveal>
+          <ul className="mt-6 space-y-3">
+            {latest.map((p, i) => (
+              <Reveal key={p.slug} delay={i * 120}>
+                <CardRouterLink
                   to={`/blog/${p.slug}`}
-                  className="flex items-baseline justify-between gap-4 rounded-xl border border-gray-800/80 bg-gray-900/50 px-5 py-4 transition-all hover:-translate-y-0.5 hover:border-cyan-400/40"
+                  className="flex items-baseline justify-between gap-4"
                 >
-                  <span className="font-medium text-gray-100">{p.title}</span>
+                  <div>
+                    <span className="font-medium text-gray-100">{p.title}</span>
+                    {p.tags.length > 0 && (
+                      <span className="ml-3 text-xs text-gray-500">
+                        {p.tags.join(' · ')}
+                      </span>
+                    )}
+                  </div>
                   <time className="shrink-0 font-mono text-xs text-gray-500">
                     {p.date}
                   </time>
-                </Link>
-              </li>
+                </CardRouterLink>
+              </Reveal>
             ))}
           </ul>
         </section>
       )}
+
+      {/* ── 03. Elsewhere ── */}
+      <section>
+        <Reveal>
+          <NumberedSection number="03" title="Elsewhere" />
+        </Reveal>
+        <Reveal delay={120}>
+          <p className="mt-5 text-gray-400">
+            Find me on{' '}
+            <a
+              href="https://github.com/zhanghongzheng6"
+              target="_blank"
+              rel="noreferrer"
+              className="link-underline text-cyan-400"
+            >
+              GitHub
+            </a>
+            .
+          </p>
+        </Reveal>
+      </section>
     </div>
   )
 }

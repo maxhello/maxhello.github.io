@@ -1,25 +1,51 @@
+import { Card, SectionSubtitle, SectionTitle } from '../components/ui'
+
+const sections = [
+  {
+    icon: '🔧',
+    title: 'Building',
+    titleClass: 'text-cyan-300',
+    items: ['This personal site'],
+  },
+  {
+    icon: '📚',
+    title: 'Learning',
+    titleClass: 'text-violet-300',
+    items: ['AI / machine learning'],
+  },
+]
+
 export default function Now() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-gradient text-3xl font-bold">Now</h1>
-        <p className="mt-2 text-sm text-gray-400">
-          What I'm doing, learning, and playing with right now.
-        </p>
+        <SectionTitle>Now</SectionTitle>
+        <SectionSubtitle>
+          What I'm doing, learning, and playing with right now — inspired by{' '}
+          <a
+            href="https://nownownow.com/"
+            target="_blank"
+            rel="noreferrer"
+            className="text-cyan-400 hover:text-cyan-300"
+          >
+            /now pages
+          </a>
+          .
+        </SectionSubtitle>
       </div>
-      <div className="space-y-6 leading-relaxed text-gray-300">
-        <section className="rounded-xl border border-gray-800/80 bg-gray-900/50 p-5">
-          <h2 className="mb-3 font-semibold text-cyan-300">🔧 Building</h2>
-          <ul className="list-disc space-y-1 pl-5 text-gray-300">
-            <li>This personal site</li>
-          </ul>
-        </section>
-        <section className="rounded-xl border border-gray-800/80 bg-gray-900/50 p-5">
-          <h2 className="mb-3 font-semibold text-violet-300">📚 Learning</h2>
-          <ul className="list-disc space-y-1 pl-5 text-gray-300">
-            <li>AI / machine learning</li>
-          </ul>
-        </section>
+      <div className="space-y-4">
+        {sections.map((s) => (
+          <Card key={s.title}>
+            <h2 className={`mb-3 font-semibold ${s.titleClass}`}>
+              {s.icon} {s.title}
+            </h2>
+            <ul className="list-disc space-y-1.5 pl-5 leading-relaxed text-gray-300">
+              {s.items.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </Card>
+        ))}
       </div>
       <p className="font-mono text-xs text-gray-500">Last updated: Aug 2026</p>
     </div>

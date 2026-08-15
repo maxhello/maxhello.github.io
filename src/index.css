@@ -1,8 +1,90 @@
 @import "tailwindcss";
 
+/* ─────────────────────────────────────────────────────────
+   Design tokens & 全站复用样式层
+   规则:页面里禁止再手写重复的长 className,
+        卡片用 <Card>,标题用 <SectionTitle>,标签用 <Tag>
+   ───────────────────────────────────────────────────────── */
+
+@theme {
+  /* 字体栈:标题/正文用 Inter,代码/时间戳用 JetBrains Mono */
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "PingFang SC",
+    "Microsoft YaHei", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* 品牌色阶(全站唯一强调色系,别处禁止裸写 cyan/violet 色值) */
+  --color-accent: #22d3ee; /* 主强调 cyan-400 */
+  --color-accent-soft: #67e8f9; /* 亮强调 cyan-300 */
+  --color-accent-2: #a78bfa; /* 次强调 violet-400 */
+  --color-surface: #0b1220; /* 卡片底色 */
+  --color-surface-2: #111a2e; /* 卡片 hover 底色 */
+}
+
 html {
   scroll-behavior: smooth;
   color-scheme: dark;
+}
+
+body {
+  font-family: var(--font-sans);
+}
+
+/* ── 卡片:全站唯一的卡片样式 ─────────────────────── */
+.card {
+  border-radius: 0.75rem;
+  border: 1px solid rgb(31 41 55 / 0.8);
+  background: var(--color-surface);
+  transition: transform 0.3s, border-color 0.3s, box-shadow 0.3s;
+}
+.card:hover {
+  transform: translateY(-2px);
+  border-color: rgb(34 211 238 / 0.4);
+  box-shadow: 0 0 24px -10px rgb(34 211 238 / 0.4);
+}
+
+/* ── 区块大标题:渐变字 ─────────────────────────────── */
+.heading-gradient {
+  background: linear-gradient(135deg, #67e8f9 0%, #60a5fa 45%, #a78bfa 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ── 标签:圆角描边小标签 ───────────────────────────── */
+.tag {
+  border-radius: 9999px;
+  border: 1px solid rgb(55 65 81);
+  padding: 0.125rem 0.5rem;
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+/* ── 主/次按钮 ─────────────────────────────────────── */
+.btn-primary {
+  border-radius: 0.5rem;
+  background: linear-gradient(90deg, #06b6d4, #2563eb);
+  padding: 0.625rem 1.25rem;
+  font-weight: 500;
+  color: #fff;
+  box-shadow: 0 0 24px -6px rgb(34 211 238 / 0.6);
+  transition: box-shadow 0.3s;
+}
+.btn-primary:hover {
+  box-shadow: 0 0 32px -4px rgb(34 211 238 / 0.8);
+}
+
+.btn-ghost {
+  border-radius: 0.5rem;
+  border: 1px solid rgb(55 65 81);
+  background: rgb(17 26 46 / 0.5);
+  padding: 0.625rem 1.25rem;
+  font-weight: 500;
+  color: #e5e7eb;
+  transition: border-color 0.3s, color 0.3s;
+}
+.btn-ghost:hover {
+  border-color: rgb(167 139 250 / 0.6);
+  color: #c4b5fd;
 }
 
 /* ── 极光背景:两层渐变光斑缓慢漂移 ─────────────────── */
@@ -50,7 +132,7 @@ html {
   to   { transform: translate(-14vw, -10vh) scale(0.9); }
 }
 
-/* ── 网格叠加层:极淡的科技感网格,随滚动轻微视差 ── */
+/* ── 网格叠加层 ────────────────────────────────────── */
 .grid-overlay {
   position: fixed;
   inset: 0;
@@ -63,14 +145,6 @@ html {
   mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, black 30%, transparent 75%);
 }
 
-/* ── 渐变文字 ─────────────────────────────────────── */
-.text-gradient {
-  background: linear-gradient(135deg, #67e8f9 0%, #60a5fa 45%, #a78bfa 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
 /* ── 入场动画 ─────────────────────────────────────── */
 @keyframes fade-up {
   from { opacity: 0; transform: translateY(16px); }
@@ -81,7 +155,6 @@ html {
   animation: fade-up 0.6s ease-out both;
 }
 
-/* 尊重减弱动效偏好 */
 @media (prefers-reduced-motion: reduce) {
   .aurora-bg::before,
   .aurora-bg::after,
@@ -90,7 +163,7 @@ html {
   }
 }
 
-/* ── 滚动条 ───────────────────────────────────────── */
+/* ── 滚动条 / 选中文本 ─────────────────────────────── */
 ::-webkit-scrollbar { width: 10px; }
 ::-webkit-scrollbar-track { background: #030712; }
 ::-webkit-scrollbar-thumb {
@@ -100,7 +173,6 @@ html {
 }
 ::-webkit-scrollbar-thumb:hover { background: #334155; }
 
-/* ── 选中文本 ─────────────────────────────────────── */
 ::selection {
   background: rgba(34, 211, 238, 0.3);
   color: #f0fdff;
@@ -110,4 +182,74 @@ html {
 .hljs {
   color: #e6edf3;
   background: transparent;
+}
+
+/* ═══════════════════════════════════════════════════
+   hero-scoped:首页 Hero 与编号区块专用样式
+   ═══════════════════════════════════════════════════ */
+
+/* Hero 逃逸 max-w-3xl 容器,占满视口宽 */
+.hero-breakout {
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+}
+
+.hero-title {
+  font-size: clamp(3rem, 8vw, 6rem);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+
+/* 入场 stagger:配合 .fade-up 使用 */
+.fade-up-delay-1 { animation-delay: 80ms; }
+.fade-up-delay-2 { animation-delay: 160ms; }
+.fade-up-delay-3 { animation-delay: 240ms; }
+.fade-up-delay-4 { animation-delay: 320ms; }
+
+/* 向下滚动箭头 */
+@keyframes bounce-soft {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(8px); }
+}
+.scroll-hint {
+  animation: bounce-soft 2s ease-in-out infinite;
+}
+
+/* 链接下划线:左侧滑入 */
+.link-underline {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-size: 0% 2px;
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  transition: background-size 0.3s ease;
+  padding-bottom: 2px;
+}
+.link-underline:hover {
+  background-size: 100% 2px;
+}
+
+/* 滚动 reveal(由 useInView 加 .is-visible 触发) */
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scroll-hint,
+  .fade-up-delay-1,
+  .fade-up-delay-2,
+  .fade-up-delay-3,
+  .fade-up-delay-4 {
+    animation: none;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
 }

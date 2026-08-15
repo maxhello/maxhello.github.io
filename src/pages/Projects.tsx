@@ -1,18 +1,12 @@
 import { languageColors, repos, type Repo } from '../lib/github'
+import { CardLink, SectionSubtitle, SectionTitle, Tag } from '../components/ui'
 
 function RepoCard({ repo }: { repo: Repo }) {
   return (
-    <a
-      href={repo.html_url}
-      target="_blank"
-      rel="noreferrer"
-      className="group relative block rounded-xl border border-gray-800 bg-gray-900/60 p-5 transition-all duration-300 hover:-translate-y-1 hover:border-cyan-400/50 hover:shadow-[0_0_30px_-8px_rgba(34,211,238,0.35)]"
-    >
+    <CardLink href={repo.html_url} target="_blank" rel="noreferrer">
       <div className="flex items-start justify-between gap-3">
-        <h2 className="font-bold text-cyan-300 group-hover:text-cyan-200">
-          {repo.name}
-        </h2>
-        <span className="flex shrink-0 items-center gap-1 text-xs text-gray-400">
+        <h2 className="font-bold text-cyan-300">{repo.name}</h2>
+        <span className="shrink-0 text-xs text-gray-400">
           ★ {repo.stargazers_count}
         </span>
       </div>
@@ -30,15 +24,10 @@ function RepoCard({ repo }: { repo: Repo }) {
           </span>
         )}
         {repo.topics.slice(0, 3).map((t) => (
-          <span
-            key={t}
-            className="rounded-full border border-gray-700 px-2 py-0.5 text-gray-400"
-          >
-            {t}
-          </span>
+          <Tag key={t}>{t}</Tag>
         ))}
       </div>
-    </a>
+    </CardLink>
   )
 }
 
@@ -46,12 +35,10 @@ export default function Projects() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="bg-gradient-to-r from-cyan-300 via-blue-400 to-violet-400 bg-clip-text text-3xl font-bold text-transparent">
-          Projects
-        </h1>
-        <p className="mt-2 text-sm text-gray-400">
+        <SectionTitle>Projects</SectionTitle>
+        <SectionSubtitle>
           Live from my GitHub, sorted by stars & recent activity.
-        </p>
+        </SectionSubtitle>
       </div>
 
       {repos.length === 0 && (
