@@ -1,7 +1,7 @@
 [
   {
     "username": "Max__Zhang",
-    "totalXp": 10280,
+    "totalXp": 10375,
     "streak": 20,
     "streakStart": "2026-07-27",
     "learningLanguage": "en",
@@ -87,55 +87,6 @@
         "minutes": 41,
         "xp": 716
       }
-    },
-    "longestStreak": 20,
-    "sessionCount": 221,
-    "sections": [
-      {
-        "cefr": "Intro",
-        "unitsTotal": 10,
-        "unitsCompleted": 10
-      },
-      {
-        "cefr": "A1",
-        "unitsTotal": 30,
-        "unitsCompleted": 4
-      },
-      {
-        "cefr": "A1",
-        "unitsTotal": 30,
-        "unitsCompleted": 0
-      },
-      {
-        "cefr": "A2",
-        "unitsTotal": 60,
-        "unitsCompleted": 0
-      },
-      {
-        "cefr": "B1",
-        "unitsTotal": 255,
-        "unitsCompleted": 0
-      },
-      {
-        "cefr": "B1",
-        "unitsTotal": 260,
-        "unitsCompleted": 0
-      },
-      {
-        "cefr": "B2",
-        "unitsTotal": 180,
-        "unitsCompleted": 0
-      },
-      {
-        "cefr": "B2",
-        "unitsTotal": 180,
-        "unitsCompleted": 0
-      },
-      {
-        "cefr": null,
-        "unitsTotal": 1,
-        "unitsCompleted": 0
-      }
-    ]
+    }
   }
 ]
