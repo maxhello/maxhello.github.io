@@ -6,6 +6,7 @@ import Projects from './pages/Projects'
 import Blog from './pages/Blog'
 import Post from './pages/Post'
 import Now from './pages/Now'
+import English from './pages/English'
 import NotFound from './pages/NotFound'
 
 export default function App() {
@@ -18,6 +19,7 @@ export default function App() {
         <Route path="/blog" element={<Blog />} />
         <Route path="/blog/:slug" element={<Post />} />
         <Route path="/now" element={<Now />} />
+        <Route path="/english" element={<English />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Layout>

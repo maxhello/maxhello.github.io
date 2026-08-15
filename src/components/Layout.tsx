@@ -1,12 +1,14 @@
 import { NavLink, Link } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import ParticleField from './ParticleField'
+import { site } from '../site.config'
 
 const navItems = [
   { to: '/', label: 'Home' },
   { to: '/projects', label: 'Projects' },
   { to: '/blog', label: 'Blog' },
   { to: '/now', label: 'Now' },
+  { to: '/english', label: 'English' },
   { to: '/about', label: 'About' },
 ]
 
@@ -19,10 +21,17 @@ export default function Layout({ children }: { children: ReactNode }) {
       <div className="grid-overlay" />
 
       <header className="sticky top-0 z-10 border-b border-gray-800/60 bg-gray-950/70 backdrop-blur-md">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
-          <Link to="/" className="font-bold tracking-wide">
+        <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-2.5">
+          <Link to="/" className="group flex items-center gap-2.5 font-bold tracking-wide">
+            <img
+              src={`https://github.com/${site.githubUser}.png`}
+              alt="Max"
+              width={28}
+              height={28}
+              className="size-7 rounded-full border border-cyan-400/40 object-cover transition-all duration-300 group-hover:border-cyan-300 group-hover:shadow-[0_0_16px_-4px_rgba(34,211,238,0.8)]"
+            />
             <span className="heading-gradient">Max</span>
-            <span className="ml-1 inline-block size-2 animate-pulse rounded-full bg-cyan-400 align-middle" />
+            <span className="inline-block size-2 animate-pulse rounded-full bg-cyan-400 align-middle" />
           </Link>
           <nav className="flex items-center gap-1 text-sm">
             {navItems.map(({ to, label }) => (
