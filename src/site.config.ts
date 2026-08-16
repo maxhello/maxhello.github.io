@@ -15,7 +15,7 @@ export const site = {
   /** 用户站点仓库名(必须是 `${githubUser}.github.io`) */
   siteRepo: 'maxhello.github.io',
   /** 固定展示的仓库名(Projects 页置顶) */
-  pinnedRepos: ['maxhello.github.io'],
+  pinnedRepos: ['lp-lab', 'maxhello.github.io'],
   /** giscus 评论配置(giscus.app 生成,repo 改名后 ID 不变) */
   giscus: {
     repoId: 'R_kgDORrItCQ',

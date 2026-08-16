@@ -1,12 +1,23 @@
 import { languageColors, repos, type Repo } from '../lib/github'
-import { CardLink, SectionSubtitle, SectionTitle, Tag } from '../components/ui'
+import { Card, SectionSubtitle, SectionTitle, Tag } from '../components/ui'
 import { usePageTitle } from '../hooks/usePageTitle'
 
 function RepoCard({ repo }: { repo: Repo }) {
+  // demo 链接来自 GitHub repo 的 homepage 字段(在仓库 About 里设置)
+  const demoUrl = repo.homepage
   return (
-    <CardLink href={repo.html_url} target="_blank" rel="noreferrer">
+    <Card>
       <div className="flex items-start justify-between gap-3">
-        <h2 className="font-bold text-cyan-300">{repo.name}</h2>
+        <h2 className="font-bold">
+          <a
+            href={repo.html_url}
+            target="_blank"
+            rel="noreferrer"
+            className="text-cyan-300 hover:underline"
+          >
+            {repo.name}
+          </a>
+        </h2>
         <span className="shrink-0 text-xs text-gray-400">
           ★ {repo.stargazers_count}
         </span>
@@ -27,8 +38,18 @@ function RepoCard({ repo }: { repo: Repo }) {
         {repo.topics.slice(0, 3).map((t) => (
           <Tag key={t}>{t}</Tag>
         ))}
+        {demoUrl && (
+          <a
+            href={demoUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="ml-auto rounded-full bg-violet-500/15 px-2.5 py-1 font-medium text-violet-300 transition hover:bg-violet-500/25"
+          >
+            Live demo ↗
+          </a>
+        )}
       </div>
-    </CardLink>
+    </Card>
   )
 }
 

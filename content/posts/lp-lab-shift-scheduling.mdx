@@ -1,0 +1,104 @@
+export const frontmatter = {
+  title: 'lp-lab: Shift Scheduling in Milliseconds with OR-Tools CP-SAT',
+  date: '2026-08-16',
+  tags: ['Projects', 'OR-Tools'],
+  excerpt:
+    'Why I built a shift scheduling engine on constraint programming — and how fairness across hours, weekends and nights fits into one objective function.',
+}
+
+I published [lp-lab](https://github.com/maxhello/lp-lab) — a shift scheduling
+engine that takes your staff, your rules and your coverage needs, and returns a
+fair, legal schedule in milliseconds. Try the
+[live demo](https://lp-lab.onrender.com/) (free tier: first hit after idle
+takes ~30–60s to wake up).
+
+## The problem
+
+Employee scheduling looks like a spreadsheet problem until you actually try to
+fill one in. A one-week plan for a small team has to satisfy all of the
+following at once:
+
+- **Coverage**: every day × shift slot needs between min and max headcount,
+  sometimes with required skills ("every late shift needs at least one
+  CPR-certified employee").
+- **Labor rules**: max consecutive working days, minimum rest between shifts
+  (including cross-midnight ones), weekly hour caps, at most one shift per day.
+- **Fairness**: nobody should silently collect all the weekend or night shifts.
+- **Preferences**: preferred shifts where possible, time-off requests respected.
+
+Check any two of those by hand and it is fine. Satisfy all of them at once,
+week after week, across a whole team — that is a combinatorial search problem,
+and humans solve it by repeatedly breaking the rule nobody is watching.
+
+This is exactly what constraint programming eats for breakfast.
+
+## The model
+
+lp-lab is a thin, careful layer on top of
+[Google OR-Tools](https://developers.google.com/optimization) CP-SAT. Every
+`(employee, day, shift)` triple becomes one boolean variable, and each rule is
+a small constraint over those booleans:
+
+| Rule | Encoding |
+| --- | --- |
+| Coverage | `min ≤ Σ assigns ≤ max` per slot |
+| Required skill | `Σ qualified-employee assigns ≥ 1` |
+| One shift/day | `Σ shift assigns ≤ 1` per employee-day |
+| Consecutive days | sliding-window sum ≤ limit |
+| Min rest | forbidden adjacent-day shift pairs (cross-midnight aware) |
+| Weekly cap | `Σ assigns × duration ≤ cap` per 7-day window |
+| Hard time-off | variable fixed to 0 |
+
+The example scenario in the README — 3 employees, 3 shift types, a week of
+coverage with skills and time-off — solves in about **24 ms**, and CP-SAT
+tells you whether the answer is `OPTIMAL`, merely `FEASIBLE`, or provably
+`INFEASIBLE`. That last one matters: instead of "the solver didn't find
+anything", you get a machine-checkable statement that *no* valid schedule
+exists under these rules, and a hint about why.
+
+## Fairness is the interesting part
+
+Balancing total hours is the naive version of fairness. The subtle failure
+mode is **cross-dimensional**: suppose there are 4 weekends of shifts to cover
+and 5 employees — weekend rest cannot be split evenly, so someone loses their
+weekend no matter what. Hours-only fairness is blind to that.
+
+lp-lab converts weekend shifts, night shifts and hours into a single
+**hardship score** (weekend shift = 480, night shift = 240, one hour = 60) and
+minimises the spread of that score. When weekend rest cannot be divided
+evenly, the person who loses their weekend gets compensated with fewer nights
+or a lighter load — automatically, because the objective function sees all
+three dimensions as one currency.
+
+Preferences ride along in the same objective: soft time-off violations are
+penalised, preferred-shift matches are rewarded, all with configurable
+weights.
+
+## Failing fast, and not trusting the solver
+
+Two engineering choices worth calling out:
+
+**`/api/validate`** runs cheap pre-checks before you ever invoke the solver —
+things like "min_staff exceeds the number of skill-qualified employees". Most
+impossible setups are configuration mistakes, not deep infeasibility, and they
+should fail in microseconds with a human-readable message, not after a solve
+attempt.
+
+**Tests recompute everything.** For every hard constraint, the test suite
+independently recomputes the property (rest hours, consecutive days, coverage,
+caps…) directly from the returned assignments. The solver's own claims about
+its solutions are never trusted. Solvers are extremely good at what they do,
+but the moment you treat "it returned a schedule" as "it returned a *valid*
+schedule", you have a production incident waiting for its first shift swap.
+
+## Product shape
+
+- **Web UI + REST API**, no database — input auto-saves to localStorage,
+  results export to CSV in one click.
+- The UI is a plain form over the same JSON the API accepts; nothing hidden.
+- Ships with a `Dockerfile`, plus `render.yaml` for one-click Render deploys
+  (that is what the demo runs on).
+
+Check the [repo](https://github.com/maxhello/lp-lab) for the full API docs,
+or go break the solver with an impossible roster in the
+[demo](https://lp-lab.onrender.com/) — `/api/validate` will tell on you.
