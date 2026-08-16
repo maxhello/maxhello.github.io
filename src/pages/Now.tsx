@@ -1,4 +1,5 @@
 import { Card, SectionSubtitle, SectionTitle } from '../components/ui'
+import { usePageTitle } from '../hooks/usePageTitle'
 
 const sections = [
   {
@@ -16,6 +17,7 @@ const sections = [
 ]
 
 export default function Now() {
+  usePageTitle('Now')
   return (
     <div className="space-y-8">
       <div>

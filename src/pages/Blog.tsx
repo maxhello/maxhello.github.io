@@ -1,7 +1,9 @@
 import { posts } from '../lib/posts'
 import { CardRouterLink, SectionSubtitle, SectionTitle, Tag } from '../components/ui'
+import { usePageTitle } from '../hooks/usePageTitle'
 
 export default function Blog() {
+  usePageTitle('Blog')
   return (
     <div className="space-y-8">
       <div>

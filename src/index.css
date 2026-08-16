@@ -178,10 +178,52 @@ body {
   color: #f0fdff;
 }
 
-/* ── 代码高亮(暗色基底) ──────────────────────────── */
+/* ── 代码高亮(暗色基底 + token 色,不引 highlight.js 官方主题) ── */
 .hljs {
   color: #e6edf3;
   background: transparent;
+}
+.hljs-comment,
+.hljs-quote {
+  color: #8b949e;
+}
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-meta,
+.hljs-tag {
+  color: #c4b5fd;
+}
+.hljs-string,
+.hljs-regexp,
+.hljs-addition {
+  color: #7dd3fc;
+}
+.hljs-number,
+.hljs-literal,
+.hljs-variable,
+.hljs-template-variable {
+  color: #67e8f9;
+}
+.hljs-title,
+.hljs-section,
+.hljs-name,
+.hljs-selector-id,
+.hljs-selector-class,
+.hljs-built_in {
+  color: #5eead4;
+}
+.hljs-attr,
+.hljs-attribute {
+  color: #a5f3fc;
+}
+.hljs-deletion {
+  color: #fda4af;
+}
+.hljs-emphasis {
+  font-style: italic;
+}
+.hljs-strong {
+  font-weight: 600;
 }
 
 /* ═══════════════════════════════════════════════════

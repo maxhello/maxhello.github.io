@@ -3,6 +3,13 @@
  * 代码里一律从这里 import,改名时只改这一个文件。
  */
 export const site = {
+  /** 站点正式地址(无尾斜杠):canonical / sitemap / RSS / robots 共用 */
+  siteUrl: 'https://maxhello.github.io',
+  /** SEO / RSS / 页面标题用 */
+  siteName: 'Max Zhang',
+  tagline: 'Backend & AI',
+  siteDescription:
+    'Backend / systems engineer exploring AI — projects, notes, and an English-learning dashboard.',
   /** GitHub 用户名 */
   githubUser: 'maxhello',
   /** 用户站点仓库名(必须是 `${githubUser}.github.io`) */

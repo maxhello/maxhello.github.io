@@ -1,5 +1,6 @@
 import { languageColors, repos, type Repo } from '../lib/github'
 import { CardLink, SectionSubtitle, SectionTitle, Tag } from '../components/ui'
+import { usePageTitle } from '../hooks/usePageTitle'
 
 function RepoCard({ repo }: { repo: Repo }) {
   return (
@@ -32,6 +33,7 @@ function RepoCard({ repo }: { repo: Repo }) {
 }
 
 export default function Projects() {
+  usePageTitle('Projects')
   return (
     <div className="space-y-8">
       <div>

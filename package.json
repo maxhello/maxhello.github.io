@@ -4,9 +4,11 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "prebuild": "tsx scripts/fetch-repos.ts",
+    "data": "tsx scripts/fetch-repos.ts && tsx scripts/gen-static.ts",
+    "dev": "npm run data && vite",
+    "prebuild": "npm run data",
     "build": "tsc -b && vite build",
+    "test:py": "python3 scripts/test_fetch_duolingo.py",
     "preview": "vite preview"
   },
   "dependencies": {

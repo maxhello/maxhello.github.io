@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import history from '../../data/duolingo-history.json'
 import { Card, SectionTitle, SectionSubtitle } from '../components/ui'
+import { usePageTitle } from '../hooks/usePageTitle'
 
 interface DayDetail {
   lessons: number
@@ -30,7 +31,14 @@ interface Snapshot {
 const snaps = history as Snapshot[]
 const latest = snaps[snaps.length - 1]
 const first = snaps[0]
-const todayIso = new Date().toISOString().slice(0, 10)
+
+/** 访客本地日期(不能 toISOString:那是 UTC,北京时间早上 8 点前还是"昨天") */
+function localIsoDate(): string {
+  const d = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+const todayIso = localIsoDate()
 
 /** 每日明细:最新快照的 daily 全量 + XP 差值兜底 */
 function dailyDetail(): Map<string, DayDetail> {
@@ -208,6 +216,15 @@ function DailyChart() {
   const linePath = days.map((d, i) => `${px(i)},${pyMin(d.minutes)}`).join(' L ')
   const hoverD = hover !== null ? days[hover] : null
 
+  /** 指针/手指横坐标 → 天索引,越界置空(鼠标与触屏共用) */
+  const locate = (clientX: number) => {
+    const rect = ref.current?.getBoundingClientRect()
+    if (!rect) return
+    const x = ((clientX - rect.left) / rect.width) * W
+    const i = Math.floor(x / bw)
+    setHover(i >= 0 && i < days.length ? i : null)
+  }
+
   return (
     <svg
       ref={ref}
@@ -215,14 +232,11 @@ function DailyChart() {
       className="w-full"
       role="img"
       aria-label="Daily XP and minutes"
+      style={{ touchAction: 'pan-y' }}
       onMouseLeave={() => setHover(null)}
-      onMouseMove={(e) => {
-        const rect = ref.current?.getBoundingClientRect()
-        if (!rect) return
-        const x = ((e.clientX - rect.left) / rect.width) * W
-        const i = Math.floor(x / bw)
-        setHover(i >= 0 && i < days.length ? i : null)
-      }}
+      onMouseMove={(e) => locate(e.clientX)}
+      onTouchStart={(e) => locate(e.touches[0].clientX)}
+      onTouchMove={(e) => locate(e.touches[0].clientX)}
     >
       <defs>
         <linearGradient id="xpArea" x1="0" y1="0" x2="0" y2="1">
@@ -330,6 +344,7 @@ function Stat({ value, label }: { value: string; label: string }) {
 }
 
 export default function English() {
+  usePageTitle('English')
   const streakN = useCountUp(latest?.streak ?? 0)
   if (!latest) {
     return (

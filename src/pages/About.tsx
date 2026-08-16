@@ -1,6 +1,8 @@
 import { SectionTitle } from '../components/ui'
+import { usePageTitle } from '../hooks/usePageTitle'
 
 export default function About() {
+  usePageTitle('About')
   return (
     <div className="space-y-8">
       <SectionTitle>About Me</SectionTitle>

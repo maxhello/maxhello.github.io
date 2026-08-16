@@ -33,14 +33,15 @@ export default function Layout({ children }: { children: ReactNode }) {
             <span className="heading-gradient">Max</span>
             <span className="inline-block size-2 animate-pulse rounded-full bg-cyan-400 align-middle" />
           </Link>
-          <nav className="flex items-center gap-1 text-sm">
+          {/* 窄屏允许横向滚动兜底,避免 6 个导航项挤爆 375px */}
+          <nav className="flex min-w-0 items-center gap-0.5 overflow-x-auto text-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {navItems.map(({ to, label }) => (
               <NavLink
                 key={to}
                 to={to}
                 end={to === '/'}
                 className={({ isActive }) =>
-                  `rounded-lg px-3 py-1.5 transition-colors ${
+                  `shrink-0 rounded-lg px-2 py-1.5 transition-colors sm:px-3 ${
                     isActive
                       ? 'bg-gray-800/80 font-medium text-cyan-300'
                       : 'text-gray-300 hover:bg-gray-800/80 hover:text-white'

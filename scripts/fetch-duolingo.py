@@ -8,6 +8,8 @@
      逐课 xpGains 记录 → 按天聚合出每日课程数与学习时长(分钟)
 
 一天一条,同日重跑覆盖。时长口径:相邻课程间隔<15分钟累加,末课+5分钟。
+归日统一按北京时间(Asia/Shanghai),与多邻国 streak 口径一致,本地跑和 CI(UTC)结果相同。
+全量 daily 只保留在最新快照,旧快照剥掉 daily,防止文件随天数平方膨胀。
 
 用法: python3 scripts/fetch-duolingo.py
 CI:  GitHub Actions 每日定时跑,自动 commit 数据文件。
@@ -18,8 +20,9 @@ import ssl
 import sys
 import urllib.request
 from collections import defaultdict
-from datetime import date, datetime
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 USERNAME = "Max__Zhang"
 USER_ID = "316697694210185"  # 登录接口按 id 查询,公开接口按 username
@@ -30,6 +33,7 @@ OUT = Path(__file__).resolve().parent.parent / "data" / "duolingo-history.json"
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
 GAP_MAX = 15 * 60  # 相邻课程间隔超过 15 分钟不算同次学习
 LAST_LESSON_MIN = 5  # 每天最后一节课的估算时长
+TZ = ZoneInfo("Asia/Shanghai")  # 归日时区固定为北京时间,不随运行环境(本地/CI)漂移
 
 
 def ssl_ctx():
@@ -85,6 +89,11 @@ def fetch_public():
     }
 
 
+def day_key(ts: int) -> str:
+    """unix 秒 → 北京日期键。显式传时区,系统时区(本地 UTC+8 / CI UTC)不影响结果。"""
+    return datetime.fromtimestamp(ts, TZ).strftime("%Y-%m-%d")
+
+
 def fetch_daily_detail(token):
     """带 JWT 拉逐课记录,聚合成 {date: {lessons, minutes, xp}}。失败返回空。"""
     try:
@@ -94,7 +103,7 @@ def fetch_daily_detail(token):
         return None
     byday = defaultdict(list)
     for g in u.get("xpGains") or []:
-        byday[datetime.fromtimestamp(g["time"]).strftime("%Y-%m-%d")].append(g)
+        byday[day_key(g["time"])].append(g)
     detail = {}
     for d, gains in byday.items():
         times = sorted(g["time"] for g in gains)
@@ -115,31 +124,16 @@ def fetch_daily_detail(token):
     return detail, extra
 
 
-def main():
-    today = date.today().isoformat()
-    snapshot = fetch_public()
-    snapshot["date"] = today
+def merge_history(history: list, snapshot: dict) -> list:
+    """把新快照并进历史,返回新的 history 列表(会就地给 snapshot 写入合并后的 daily)。
 
-    # 若有 JWT,附带每日明细(今天+历史全部重算,xpGains 本身带全量历史)
-    token = os.environ.get("DUOLINGO_JWT")
-    if token:
-        result = fetch_daily_detail(token)
-        if result:
-            detail, extra = result
-            snapshot["daily"] = detail
-            snapshot["longestStreak"] = extra.get("longestStreak")
-            snapshot["sessionCount"] = extra.get("sessionCount")
-            snapshot["sections"] = extra.get("sections")
-            t = detail.get(today)
-            if t:
-                print(f"today: {t['lessons']} lessons ~{t['minutes']}min {t['xp']}xp")
-
-    history = []
-    if OUT.exists():
-        history = json.loads(OUT.read_text())
-
-    # 合并历史 daily:接口只返回最近窗口,旧快照里已存的天数不能丢。
-    # 规则:新拉到的天覆盖同日旧值,窗口外的旧天保留。
+    规则:
+      - daily 按天合并:新拉到的天覆盖同日旧值,窗口外的旧天保留
+        (xpGains 只返回最近约 15 天,更早的天数只存在于旧快照里)。
+      - 同日旧快照整体丢弃(一天一条,重跑覆盖),结果按日期升序。
+      - 防膨胀:全量 daily 只保留在最新快照,旧快照剥掉 daily;
+        页面对无明细的旧快照用 totalXp 差值兜底(见 src/pages/English.tsx)。
+    """
     merged_daily: dict = {}
     for old in history:
         for d, v in (old.get("daily") or {}).items():
@@ -149,10 +143,46 @@ def main():
     if merged_daily:
         snapshot["daily"] = dict(sorted(merged_daily.items()))
 
-    # 同一天重跑覆盖;保持日期升序
-    history = [h for h in history if h["date"] != today]
-    history.append(snapshot)
-    history.sort(key=lambda h: h["date"])
+    out = [
+        {k: v for k, v in h.items() if k != "daily"}
+        for h in history
+        if h["date"] != snapshot["date"]
+    ]
+    out.append(snapshot)
+    out.sort(key=lambda h: h["date"])
+    return out
+
+
+def main():
+    today = datetime.now(TZ).date().isoformat()
+    snapshot = fetch_public()
+    snapshot["date"] = today
+
+    # 若有 JWT,附带每日明细(xpGains 是约 15 天的滚动窗口,历史靠合并保留)
+    token = os.environ.get("DUOLINGO_JWT")
+    if token:
+        result = fetch_daily_detail(token)
+        if not result:
+            # JWT 存在却拉失败,大概率过期:宁可让 workflow 变红,
+            # 也不要静默提交一份没有明细的快照,把每日曲线悄悄断掉。
+            raise SystemExit(
+                "DUOLINGO_JWT is set but the auth fetch failed (token likely expired). "
+                "Update the GitHub Secret, then re-run this workflow."
+            )
+        detail, extra = result
+        snapshot["daily"] = detail
+        snapshot["longestStreak"] = extra.get("longestStreak")
+        snapshot["sessionCount"] = extra.get("sessionCount")
+        snapshot["sections"] = extra.get("sections")
+        t = detail.get(today)
+        if t:
+            print(f"today: {t['lessons']} lessons ~{t['minutes']}min {t['xp']}xp")
+
+    history = []
+    if OUT.exists():
+        history = json.loads(OUT.read_text())
+
+    history = merge_history(history, snapshot)
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(history, ensure_ascii=False, indent=2) + "\n")

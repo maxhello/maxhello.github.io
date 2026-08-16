@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { posts } from '../lib/posts'
 import { githubProfileUrl } from '../site.config'
 import { useInView } from '../hooks/useInView'
+import { usePageTitle } from '../hooks/usePageTitle'
 import {
   CardRouterLink,
   NumberedSection,
@@ -31,6 +32,7 @@ function Reveal({
 }
 
 export default function Home() {
+  usePageTitle()
   const latest = posts.slice(0, 3)
 
   return (

@@ -35,7 +35,7 @@ export const languageColors: Record<string, string> = {
 export const pinnedRepos = site.pinnedRepos
 
 // 构建时由 scripts/fetch-repos.ts 生成的静态数据
-// (开发时若不存在,fallback 到浏览器实时拉取)
+// (dev / build 前都会自动跑该脚本,文件 gitignored,见 package.json 的 data 脚本)
 import reposJson from '../data/repos.json'
 
 export const repos: Repo[] = reposJson

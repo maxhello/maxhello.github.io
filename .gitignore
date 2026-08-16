@@ -4,3 +4,11 @@ dist
 .DS_Store
 tsconfig.tsbuildinfo
 src/data/repos.json
+
+# 构建时由 scripts/gen-static.ts 生成
+public/rss.xml
+public/sitemap.xml
+public/robots.txt
+
+# python 测试缓存
+__pycache__/
