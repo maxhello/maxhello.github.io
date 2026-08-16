@@ -103,6 +103,14 @@ def fetch_daily_detail(token):
     except Exception as e:
         print(f"auth fetch failed (fallback to public only): {e}", file=sys.stderr)
         return None
+    # 档案字段诊断:2026-08-15 起接口偶发不再返回 currentCourse/sessionCount/longestStreak,
+    # 打出来才知道字段被挪去哪了(看 Actions 日志)
+    missing = [k for k in ("currentCourse", "sessionCount", "longestStreak") if not u.get(k)]
+    if missing:
+        print(
+            f"auth profile missing: {missing}; top-level keys: {sorted(u.keys())}",
+            file=sys.stderr,
+        )
     byday = defaultdict(list)
     for g in u.get("xpGains") or []:
         byday[day_key(g["time"])].append(g)
@@ -126,6 +134,11 @@ def fetch_daily_detail(token):
     return detail, extra
 
 
+# 慢变汇总字段:接口偶发返回残缺档案(缺课程进度/累计课数/最长连胜)时沿用上一份,
+# 避免单次坏响应把页面组件打掉;下次正常响应会自然刷新
+CARRY_FORWARD_KEYS = ("sections", "sessionCount", "longestStreak")
+
+
 def merge_history(history: list, snapshot: dict) -> list:
     """把新快照并进历史,返回新的 history 列表(会就地给 snapshot 写入合并后的 daily)。
 
@@ -135,7 +148,14 @@ def merge_history(history: list, snapshot: dict) -> list:
       - 同日旧快照整体丢弃(一天一条,重跑覆盖),结果按日期升序。
       - 防膨胀:全量 daily 只保留在最新快照,旧快照剥掉 daily;
         页面对无明细的旧快照用 totalXp 差值兜底(见 src/pages/English.tsx)。
+      - sections/sessionCount/longestStreak 缺失时沿用上一份快照的值。
     """
+    prev = history[-1] if history else None
+    if prev:
+        for k in CARRY_FORWARD_KEYS:
+            if not snapshot.get(k):
+                snapshot[k] = prev.get(k)
+
     merged_daily: dict = {}
     for old in history:
         for d, v in (old.get("daily") or {}).items():

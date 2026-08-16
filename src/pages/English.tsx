@@ -378,20 +378,31 @@ export default function English() {
             <span className="text-sm text-gray-400">day streak 🔥</span>
           </div>
           {todayDetail ? (
-            <div className="mt-3 flex gap-5 text-sm">
-              <span>
-                <span className="font-bold text-cyan-300">{todayDetail.xp}</span>
-                <span className="ml-1 text-gray-500">XP</span>
-              </span>
-              <span>
-                <span className="font-bold text-violet-300">~{todayDetail.minutes}</span>
-                <span className="ml-1 text-gray-500">min</span>
-              </span>
-              <span>
-                <span className="font-bold text-gray-200">{todayDetail.lessons}</span>
-                <span className="ml-1 text-gray-500">lessons</span>
-              </span>
-            </div>
+            todayDetail.lessons > 0 ? (
+              <div className="mt-3 flex gap-5 text-sm">
+                <span>
+                  <span className="font-bold text-cyan-300">{todayDetail.xp}</span>
+                  <span className="ml-1 text-gray-500">XP</span>
+                </span>
+                <span>
+                  <span className="font-bold text-violet-300">~{todayDetail.minutes}</span>
+                  <span className="ml-1 text-gray-500">min</span>
+                </span>
+                <span>
+                  <span className="font-bold text-gray-200">{todayDetail.lessons}</span>
+                  <span className="ml-1 text-gray-500">lessons</span>
+                </span>
+              </div>
+            ) : (
+              // 有 XP 但 lessons=0:daily 明细还没同步(xpGains 当天滞后),别显示误导性的 0 分钟
+              <div className="mt-3 flex items-baseline gap-5 text-sm">
+                <span>
+                  <span className="font-bold text-cyan-300">{todayDetail.xp}</span>
+                  <span className="ml-1 text-gray-500">XP</span>
+                </span>
+                <span className="text-gray-500">lesson detail updates tonight 🦉</span>
+              </div>
+            )
           ) : (
             <p className="mt-3 text-sm text-gray-500">No lessons yet today 🦉</p>
           )}

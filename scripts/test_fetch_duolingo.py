@@ -87,6 +87,28 @@ class MergeHistoryTest(unittest.TestCase):
         out = fd.merge_history(history, snapshot)
         self.assertEqual(out[-1]["daily"]["2026-08-14"]["xp"], 10)
 
+    def test_missing_summary_fields_carry_forward(self):
+        # 接口返回残缺档案(缺 sections/sessionCount)时,沿用上一份,不打掉页面
+        history = [
+            {
+                "date": "2026-08-15",
+                "totalXp": 100,
+                "sessionCount": 221,
+                "sections": [{"cefr": "A1"}],
+            }
+        ]
+        snapshot = {"date": "2026-08-16", "totalXp": 200, "sessionCount": None}
+        out = fd.merge_history(history, snapshot)
+        self.assertEqual(out[-1]["sessionCount"], 221)
+        self.assertEqual(out[-1]["sections"], [{"cefr": "A1"}])
+
+    def test_present_summary_fields_not_overwritten(self):
+        # 正常拉到的值不被旧值覆盖
+        history = [{"date": "2026-08-15", "totalXp": 100, "sessionCount": 221}]
+        snapshot = {"date": "2026-08-16", "totalXp": 200, "sessionCount": 230}
+        out = fd.merge_history(history, snapshot)
+        self.assertEqual(out[-1]["sessionCount"], 230)
+
     def test_sorted_ascending(self):
         history = [{"date": "2026-08-14"}, {"date": "2026-08-12"}]
         snapshot = {"date": "2026-08-13", "daily": {}}
