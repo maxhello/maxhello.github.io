@@ -18,6 +18,7 @@ import json
 import os
 import ssl
 import sys
+import time
 import urllib.request
 from collections import defaultdict
 from datetime import datetime
@@ -27,7 +28,7 @@ from zoneinfo import ZoneInfo
 USERNAME = "Max__Zhang"
 USER_ID = "316697694210185"  # 登录接口按 id 查询,公开接口按 username
 PUBLIC_API = f"https://www.duolingo.com/2017-06-30/users?username={USERNAME}"
-AUTH_API = f"https://www.duolingo.com/2017-06-30/users/{USER_ID}?_=1"
+AUTH_API = f"https://www.duolingo.com/2017-06-30/users/{USER_ID}"
 OUT = Path(__file__).resolve().parent.parent / "data" / "duolingo-history.json"
 
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
@@ -97,7 +98,8 @@ def day_key(ts: int) -> str:
 def fetch_daily_detail(token):
     """带 JWT 拉逐课记录,聚合成 {date: {lessons, minutes, xp}}。失败返回空。"""
     try:
-        u = get_json(AUTH_API, auth=token)
+        # ?_= 时间戳当 cache-buster:固定值可能吃到接口缓存,当天早晨的课迟迟不进 xpGains
+        u = get_json(f"{AUTH_API}?_={int(time.time())}", auth=token)
     except Exception as e:
         print(f"auth fetch failed (fallback to public only): {e}", file=sys.stderr)
         return None

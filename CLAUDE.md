@@ -29,7 +29,9 @@ python3 scripts/fetch-duolingo.py   # 手动跑多邻国采集(见下)
 ### 数据流(三条独立管道)
 
 1. **构建时注入**:`prebuild` 跑 `npm run data` = `scripts/fetch-repos.ts`(拉仓库列表 → `src/data/repos.json`,gitignored,CI 用 `GITHUB_TOKEN`、本地匿名超限沿用旧文件)+ `scripts/gen-static.ts`(从 `content/posts` 生成 `public/rss.xml`/`sitemap.xml`/`robots.txt`,均 gitignored,域名取自 `site.config.ts`)。
-2. **每日定时采集**:`.github/workflows/duolingo.yml` 每天 23:53(北京时间)跑 `scripts/fetch-duolingo.py` → 更新 `data/duolingo-history.json` → 自动 commit(触发重新部署)。token 走 Secret `DUOLINGO_JWT`,**绝不进代码**。
+2. **每日定时采集**:`.github/workflows/duolingo.yml` 每天 4 次(北京 09:13 / 13:23 / 21:13 / 23:53)跑 `scripts/fetch-duolingo.py` → 更新 `data/duolingo-history.json` → 自动 commit(同日重跑覆盖,每天只留一条快照,以 23:53 那次为权威)。token 走 Secret `DUOLINGO_JWT`,**绝不进代码**。两个坑:
+   - **snapshot 的 commit 不会触发 `on: push`**(GITHUB_TOKEN 推送防循环规则),部署靠 `deploy.yml` 的 `workflow_run` 监听 snapshot workflow 完成来触发;
+   - **xpGains 对当天数据有数小时滞后**,白天手动跑可能缺当天明细(页面会退化为 totalXp 差值),以 23:53 定时跑为准。
 3. **博客内容**:`content/posts/*.mdx` 经 `import.meta.glob` eager 加载(`src/lib/posts.ts`)。**MDX 正文是 default export,不是命名 export**——这是曾导致文章页空白的坑。
 
 ### 多邻国数据的关键设计
