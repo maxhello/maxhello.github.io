@@ -25,7 +25,7 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-USERNAME = "Max__Zhang"
+USERNAME = "Hello.Max"  # 2026-08 改名,原 Max__Zhang;USER_ID 不随改名变,无需动
 USER_ID = "316697694210185"  # 登录接口按 id 查询,公开接口按 username
 PUBLIC_API = f"https://www.duolingo.com/2017-06-30/users?username={USERNAME}"
 AUTH_API = f"https://www.duolingo.com/2017-06-30/users/{USER_ID}"
