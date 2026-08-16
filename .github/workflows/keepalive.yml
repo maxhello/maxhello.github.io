@@ -1,0 +1,26 @@
+name: keepalive
+
+# 定时访问 Secret 里的地址,防止免费 PaaS(Render 等)实例闲置休眠
+# 分钟取 7/20/33/46/59 错开整点高负载,最大间隔 13 分钟 < 15 分钟休眠阈值
+# 加新地址:Settings → Secrets → Actions → PING_URLS(逗号分隔),不用改代码
+
+on:
+  schedule:
+    - cron: '7-59/13 * * * *'
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping all URLs
+        env:
+          URLS: ${{ secrets.PING_URLS }}
+        run: |
+          [[ -z "$URLS" ]] && { echo "PING_URLS 未配置"; exit 0; }
+          IFS=',' read -ra arr <<< "$URLS"
+          for u in "${arr[@]}"; do
+            u=$(echo "$u" | xargs)
+            echo "ping $u"
+            curl -sS -m 90 -o /dev/null -w "$u → HTTP %{http_code} (%{time_total}s)\n" "$u" || true
+          done
