@@ -7,6 +7,7 @@
 覆盖点:
   - day_key:归日固定北京时间,与系统时区无关(本地 UTC+8 / CI UTC 结果一致)
   - merge_history:同日覆盖、窗口外旧天保留、旧快照瘦身、同日重跑替换、日期升序
+  - normalize_token:剥掉手滑带上的 Bearer 前缀(2026-08-17 本地排查时踩过的坑)
 """
 import importlib.util
 import unittest
@@ -114,6 +115,16 @@ class MergeHistoryTest(unittest.TestCase):
         snapshot = {"date": "2026-08-13", "daily": {}}
         out = fd.merge_history(history, snapshot)
         self.assertEqual([h["date"] for h in out], ["2026-08-12", "2026-08-13", "2026-08-14"])
+
+
+class NormalizeTokenTest(unittest.TestCase):
+    def test_strips_bearer_prefix_and_whitespace(self):
+        # Secret/命令行里手滑带了 Bearer 前缀或空白,都要剥掉,否则拼出 Bearer Bearer → 401
+        self.assertEqual(fd.normalize_token("Bearer abc.def"), "abc.def")
+        self.assertEqual(fd.normalize_token("bearer abc.def"), "abc.def")
+        self.assertEqual(fd.normalize_token("  abc.def\n"), "abc.def")
+        self.assertEqual(fd.normalize_token("abc.def"), "abc.def")
+        self.assertEqual(fd.normalize_token(""), "")
 
 
 if __name__ == "__main__":

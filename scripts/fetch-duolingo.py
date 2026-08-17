@@ -21,7 +21,7 @@ import sys
 import time
 import urllib.request
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -175,13 +175,21 @@ def merge_history(history: list, snapshot: dict) -> list:
     return out
 
 
+def normalize_token(raw: str) -> str:
+    """剥掉手滑带上的 Bearer 前缀和首尾空白;请求头构造时会自己加前缀。"""
+    raw = (raw or "").strip()
+    if raw.lower().startswith("bearer "):
+        raw = raw[7:]
+    return raw
+
+
 def main():
     today = datetime.now(TZ).date().isoformat()
     snapshot = fetch_public()
     snapshot["date"] = today
 
     # 若有 JWT,附带每日明细(xpGains 是约 15 天的滚动窗口,历史靠合并保留)
-    token = os.environ.get("DUOLINGO_JWT")
+    token = normalize_token(os.environ.get("DUOLINGO_JWT") or "")
     if token:
         result = fetch_daily_detail(token)
         if not result:
@@ -196,6 +204,17 @@ def main():
         snapshot["longestStreak"] = extra.get("longestStreak")
         snapshot["sessionCount"] = extra.get("sessionCount")
         snapshot["sections"] = extra.get("sections")
+        days = sorted(detail)
+        if days:
+            # 覆盖范围写进日志:接口窗口滞后时一眼可见(2026-08-16/17 断档排查了半天才发现是这)
+            print(f"xpGains coverage: {days[0]} ~ {days[-1]} ({len(days)} days)")
+            yesterday = (datetime.now(TZ) - timedelta(days=1)).date().isoformat()
+            if days[-1] < yesterday:
+                print(
+                    f"warning: xpGains only covers up to {days[-1]}; "
+                    "missing days will be backfilled by later runs once the API catches up",
+                    file=sys.stderr,
+                )
         t = detail.get(today)
         if t:
             print(f"today: {t['lessons']} lessons ~{t['minutes']}min {t['xp']}xp")
