@@ -190,6 +190,12 @@ def main():
 
     # 若有 JWT,附带每日明细(xpGains 是约 15 天的滚动窗口,历史靠合并保留)
     token = normalize_token(os.environ.get("DUOLINGO_JWT") or "")
+    if not token and os.environ.get("CI"):
+        # CI 里没 token = Secret 没配上或 workflow 没映射上,宁可变红也不静默提交无明细快照
+        raise SystemExit(
+            "DUOLINGO_JWT is missing in CI: check the GitHub Secret exists and the "
+            "workflow passes it via step env (see duolingo.yml fetch step)."
+        )
     if token:
         result = fetch_daily_detail(token)
         if not result:
@@ -218,6 +224,8 @@ def main():
                     "missing days will be backfilled by later runs once the API catches up",
                     file=sys.stderr,
                 )
+            # 覆盖范围同时记进快照:不用翻 Actions 日志,打开数据文件就能看到当时拉到了哪天
+            snapshot["apiCoverage"] = f"{days[0]}~{days[-1]}({len(days)}d)"
         t = detail.get(today)
         if t:
             print(f"today: {t['lessons']} lessons ~{t['minutes']}min {t['xp']}xp")

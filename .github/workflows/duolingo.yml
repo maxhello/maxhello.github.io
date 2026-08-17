@@ -25,6 +25,9 @@ jobs:
 
       - name: Fetch Duolingo snapshot
         run: python3 scripts/fetch-duolingo.py
+        env:
+          # 漏了这三行,CI 会静默退化为纯公开模式(无日明细),2026-08-17 排查发现从一开始就漏了
+          DUOLINGO_JWT: ${{ secrets.DUOLINGO_JWT }}
 
       - name: Commit if changed
         run: |
