@@ -71,55 +71,6 @@
     "streakStart": "2026-07-27",
     "learningLanguage": "en",
     "date": "2026-08-17",
-    "sections": [
-      {
-        "cefr": "Intro",
-        "unitsTotal": 10,
-        "unitsCompleted": 10
-      },
-      {
-        "cefr": "A1",
-        "unitsTotal": 30,
-        "unitsCompleted": 4
-      },
-      {
-        "cefr": "A1",
-        "unitsTotal": 30,
-        "unitsCompleted": 0
-      },
-      {
-        "cefr": "A2",
-        "unitsTotal": 60,
-        "unitsCompleted": 0
-      },
-      {
-        "cefr": "B1",
-        "unitsTotal": 255,
-        "unitsCompleted": 0
-      },
-      {
-        "cefr": "B1",
-        "unitsTotal": 260,
-        "unitsCompleted": 0
-      },
-      {
-        "cefr": "B2",
-        "unitsTotal": 180,
-        "unitsCompleted": 0
-      },
-      {
-        "cefr": "B2",
-        "unitsTotal": 180,
-        "unitsCompleted": 0
-      },
-      {
-        "cefr": null,
-        "unitsTotal": 1,
-        "unitsCompleted": 0
-      }
-    ],
-    "sessionCount": 221,
-    "longestStreak": 20,
     "daily": {
       "2026-07-31": {
         "lessons": 2,
@@ -132,9 +83,9 @@
         "xp": 238
       },
       "2026-08-02": {
-        "lessons": 12,
-        "minutes": 35,
-        "xp": 524
+        "lessons": 2,
+        "minutes": 7,
+        "xp": 87
       },
       "2026-08-03": {
         "lessons": 12,
@@ -197,10 +148,69 @@
         "xp": 557
       },
       "2026-08-15": {
-        "lessons": 13,
-        "minutes": 41,
-        "xp": 716
+        "lessons": 17,
+        "minutes": 50,
+        "xp": 811
+      },
+      "2026-08-16": {
+        "lessons": 29,
+        "minutes": 115,
+        "xp": 1223
+      },
+      "2026-08-17": {
+        "lessons": 1,
+        "minutes": 5,
+        "xp": 38
       }
-    }
+    },
+    "longestStreak": 22,
+    "sessionCount": 255,
+    "sections": [
+      {
+        "cefr": "Intro",
+        "unitsTotal": 10,
+        "unitsCompleted": 10
+      },
+      {
+        "cefr": "A1",
+        "unitsTotal": 30,
+        "unitsCompleted": 6
+      },
+      {
+        "cefr": "A1",
+        "unitsTotal": 30,
+        "unitsCompleted": 0
+      },
+      {
+        "cefr": "A2",
+        "unitsTotal": 60,
+        "unitsCompleted": 0
+      },
+      {
+        "cefr": "B1",
+        "unitsTotal": 255,
+        "unitsCompleted": 0
+      },
+      {
+        "cefr": "B1",
+        "unitsTotal": 260,
+        "unitsCompleted": 0
+      },
+      {
+        "cefr": "B2",
+        "unitsTotal": 180,
+        "unitsCompleted": 0
+      },
+      {
+        "cefr": "B2",
+        "unitsTotal": 180,
+        "unitsCompleted": 0
+      },
+      {
+        "cefr": null,
+        "unitsTotal": 1,
+        "unitsCompleted": 0
+      }
+    ]
   }
 ]
