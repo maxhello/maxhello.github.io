@@ -71,6 +71,64 @@
     "streakStart": "2026-07-27",
     "learningLanguage": "en",
     "date": "2026-08-17",
+    "longestStreak": 22,
+    "sessionCount": 259,
+    "sections": [
+      {
+        "cefr": "Intro",
+        "unitsTotal": 10,
+        "unitsCompleted": 10
+      },
+      {
+        "cefr": "A1",
+        "unitsTotal": 30,
+        "unitsCompleted": 6
+      },
+      {
+        "cefr": "A1",
+        "unitsTotal": 30,
+        "unitsCompleted": 0
+      },
+      {
+        "cefr": "A2",
+        "unitsTotal": 60,
+        "unitsCompleted": 0
+      },
+      {
+        "cefr": "B1",
+        "unitsTotal": 255,
+        "unitsCompleted": 0
+      },
+      {
+        "cefr": "B1",
+        "unitsTotal": 260,
+        "unitsCompleted": 0
+      },
+      {
+        "cefr": "B2",
+        "unitsTotal": 180,
+        "unitsCompleted": 0
+      },
+      {
+        "cefr": "B2",
+        "unitsTotal": 180,
+        "unitsCompleted": 0
+      },
+      {
+        "cefr": null,
+        "unitsTotal": 1,
+        "unitsCompleted": 0
+      }
+    ],
+    "apiCoverage": "2026-08-03~2026-08-17(15d)"
+  },
+  {
+    "username": "Hello.Max",
+    "totalXp": 12099,
+    "streak": 22,
+    "streakStart": "2026-07-27",
+    "learningLanguage": "en",
+    "date": "2026-08-18",
     "daily": {
       "2026-07-31": {
         "lessons": 2,
@@ -158,13 +216,13 @@
         "xp": 1223
       },
       "2026-08-17": {
-        "lessons": 5,
-        "minutes": 20,
-        "xp": 179
+        "lessons": 17,
+        "minutes": 85,
+        "xp": 551
       }
     },
     "longestStreak": 22,
-    "sessionCount": 259,
+    "sessionCount": 271,
     "sections": [
       {
         "cefr": "Intro",
