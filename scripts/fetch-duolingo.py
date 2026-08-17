@@ -208,6 +208,9 @@ def main():
         if days:
             # 覆盖范围写进日志:接口窗口滞后时一眼可见(2026-08-16/17 断档排查了半天才发现是这)
             print(f"xpGains coverage: {days[0]} ~ {days[-1]} ({len(days)} days)")
+            for d in days[-3:]:
+                v = detail[d]
+                print(f"  {d}: {v['xp']}xp {v['lessons']} lessons ~{v['minutes']}min")
             yesterday = (datetime.now(TZ) - timedelta(days=1)).date().isoformat()
             if days[-1] < yesterday:
                 print(
