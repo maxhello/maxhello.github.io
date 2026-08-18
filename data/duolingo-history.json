@@ -124,8 +124,8 @@
   },
   {
     "username": "Hello.Max",
-    "totalXp": 12099,
-    "streak": 22,
+    "totalXp": 12415,
+    "streak": 23,
     "streakStart": "2026-07-27",
     "learningLanguage": "en",
     "date": "2026-08-18",
@@ -146,9 +146,9 @@
         "xp": 87
       },
       "2026-08-03": {
-        "lessons": 12,
+        "lessons": 11,
         "minutes": 41,
-        "xp": 572
+        "xp": 497
       },
       "2026-08-04": {
         "lessons": 19,
@@ -219,10 +219,15 @@
         "lessons": 17,
         "minutes": 85,
         "xp": 551
+      },
+      "2026-08-18": {
+        "lessons": 5,
+        "minutes": 17,
+        "xp": 341
       }
     },
-    "longestStreak": 22,
-    "sessionCount": 271,
+    "longestStreak": 23,
+    "sessionCount": 276,
     "sections": [
       {
         "cefr": "Intro",
@@ -270,6 +275,6 @@
         "unitsCompleted": 0
       }
     ],
-    "apiCoverage": "2026-08-03~2026-08-17(15d)"
+    "apiCoverage": "2026-08-03~2026-08-18(16d)"
   }
 ]
