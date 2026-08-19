@@ -187,6 +187,64 @@
     "streakStart": "2026-07-27",
     "learningLanguage": "en",
     "date": "2026-08-19",
+    "longestStreak": 24,
+    "sessionCount": 304,
+    "sections": [
+      {
+        "cefr": "Intro",
+        "unitsTotal": 10,
+        "unitsCompleted": 10
+      },
+      {
+        "cefr": "A1",
+        "unitsTotal": 30,
+        "unitsCompleted": 7
+      },
+      {
+        "cefr": "A1",
+        "unitsTotal": 30,
+        "unitsCompleted": 0
+      },
+      {
+        "cefr": "A2",
+        "unitsTotal": 60,
+        "unitsCompleted": 0
+      },
+      {
+        "cefr": "B1",
+        "unitsTotal": 255,
+        "unitsCompleted": 0
+      },
+      {
+        "cefr": "B1",
+        "unitsTotal": 260,
+        "unitsCompleted": 0
+      },
+      {
+        "cefr": "B2",
+        "unitsTotal": 180,
+        "unitsCompleted": 0
+      },
+      {
+        "cefr": "B2",
+        "unitsTotal": 180,
+        "unitsCompleted": 0
+      },
+      {
+        "cefr": null,
+        "unitsTotal": 1,
+        "unitsCompleted": 0
+      }
+    ],
+    "apiCoverage": "2026-08-04~2026-08-19(16d)"
+  },
+  {
+    "username": "Hello.Max",
+    "totalXp": 14596,
+    "streak": 24,
+    "streakStart": "2026-07-27",
+    "learningLanguage": "en",
+    "date": "2026-08-20",
     "daily": {
       "2026-07-31": {
         "lessons": 2,
@@ -284,13 +342,13 @@
         "xp": 1068
       },
       "2026-08-19": {
-        "lessons": 10,
-        "minutes": 33,
-        "xp": 707
+        "lessons": 27,
+        "minutes": 91,
+        "xp": 1569
       }
     },
     "longestStreak": 24,
-    "sessionCount": 304,
+    "sessionCount": 321,
     "sections": [
       {
         "cefr": "Intro",
@@ -300,7 +358,7 @@
       {
         "cefr": "A1",
         "unitsTotal": 30,
-        "unitsCompleted": 7
+        "unitsCompleted": 8
       },
       {
         "cefr": "A1",
@@ -338,6 +396,6 @@
         "unitsCompleted": 0
       }
     ],
-    "apiCoverage": "2026-08-04~2026-08-19(16d)"
+    "apiCoverage": "2026-08-05~2026-08-19(15d)"
   }
 ]
