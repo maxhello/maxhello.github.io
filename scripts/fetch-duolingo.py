@@ -75,6 +75,43 @@ def fetch_course_progress(u):
     return sections
 
 
+def extract_score_info(current_course):
+    """多邻国分数(10~160,CEFR 对齐,随课程进度/关卡测量浮动)及预估下一分所需信息。
+
+    返回字段去向:reached/lastUnitDone/nextAtUnit 进当天的 days 行 score 键,
+    max(课程满分)进 current.scoreMax:
+    - reached:当前分数(scoreMetadata.reachedScore,接口原值,无计算)
+    - lastUnitDone:最后已完成单元的全局 unitIndex。路径线性解锁,
+      每段完成的必是前 N 个单元,取第 N 个的 unitIndex
+    - nextAtUnit:"完成后到达下一分"的最末单元(全局 unitIndex)。
+      节点级 levelScoreInfo.reachedScore = 完成该节点后到达的分数,
+      页面结合推进速度算"还差几个单元、大概哪天到下一分"
+    接口偶发缺这些字段时返回空 dict:当天行没 score 键,页面用最近一份兜底。
+    分数是快变量,刻意不沿用旧值,宁可缺一天也不留过期值。
+    """
+    cc = current_course or {}
+    meta = cc.get("scoreMetadata") or {}
+    score = meta.get("reachedScore")
+    if not score:
+        return {}
+    info = {"reached": score}
+    if meta.get("pathEndingScore"):
+        info["max"] = meta["pathEndingScore"]
+    target = score + 1
+    for sec in cc.get("pathSectioned") or []:
+        units = sec.get("units") or []
+        n = min(sec.get("completedUnits") or 0, len(units))
+        if n > 0 and units[n - 1].get("unitIndex") is not None:
+            info["lastUnitDone"] = max(info.get("lastUnitDone", 0), units[n - 1]["unitIndex"])
+        for unit in units:
+            for lv in unit.get("levels") or []:
+                if ((lv.get("levelScoreInfo") or {}).get("reachedScore")) == target:
+                    idx = unit.get("unitIndex")
+                    if idx is not None:
+                        info["nextAtUnit"] = max(info.get("nextAtUnit", 0), idx)
+    return info
+
+
 def fetch_public():
     """公开主页数据:保底层,永远跑。"""
     u = get_json(PUBLIC_API).get("users", [])
@@ -130,49 +167,96 @@ def fetch_daily_detail(token):
         "sections": fetch_course_progress(u),
         "longestStreak": u.get("longestStreak"),
         "sessionCount": u.get("sessionCount"),
+        "score": extract_score_info(u.get("currentCourse")),
     }
     return detail, extra
 
 
-# 慢变汇总字段:接口偶发返回残缺档案(缺课程进度/累计课数/最长连胜)时沿用上一份,
-# 避免单次坏响应把页面组件打掉;下次正常响应会自然刷新
-CARRY_FORWARD_KEYS = ("sections", "sessionCount", "longestStreak")
+# 档案结构(2026-08-20 从 list 改为对象,公共字段提升到外层):
+#   {
+#     "meta":    {"username", "streakStart", "learningLanguage"},            # 真静态
+#     "current": {"longestStreak", "sessionCount", "sections", "scoreMax"},  # 当前状态,页面只读这份
+#     "days":    [{"date", "totalXp", "streak", "score?", "apiCoverage?"}],  # 纯时间序列,一天一行
+#     "daily":   {"YYYY-MM-DD": {"lessons", "minutes", "xp"}}               # 近窗口流水账(~15 天)
+#   }
+
+META_KEYS = ("username", "streakStart", "learningLanguage")
+# current 键:新值覆盖、缺失沿用旧值(接口偶发残缺档案,不能让单次坏响应打掉页面组件)
+CARRY_FORWARD_KEYS = ("longestStreak", "sessionCount", "sections", "scoreMax")
+# 旧 list 结构里住在每条快照上的字段(迁移时从 days 行剥掉)
+LEGACY_ROW_DROP = META_KEYS + ("longestStreak", "sessionCount", "sections", "daily")
 
 
-def merge_history(history: list, snapshot: dict) -> list:
-    """把新快照并进历史,返回新的 history 列表(会就地给 snapshot 写入合并后的 daily)。
+def migrate(data):
+    """旧 list 结构(每日自包含快照)→ 新对象结构。已是对象则原样返回。
+
+    状态字段归 current、时间序列归 days、各快照的 daily 合并到顶层、
+    score.max(旧 delta 记录)提升为 current.scoreMax。
+    """
+    if isinstance(data, dict):
+        return data
+    last = data[-1] if data else {}
+    days = []
+    score_max = None
+    for h in data:
+        row = {k: v for k, v in h.items() if k not in LEGACY_ROW_DROP}
+        score = row.get("score") or {}
+        m = score.pop("max", None)
+        if m is not None:
+            score_max = m
+        if not score:
+            row.pop("score", None)
+        days.append(row)
+    daily = {}
+    for h in data:
+        daily.update(h.get("daily") or {})
+    current = {
+        k: last.get(k)
+        for k in ("longestStreak", "sessionCount", "sections")
+        if last.get(k) is not None
+    }
+    if score_max is not None:
+        current["scoreMax"] = score_max
+    meta = {k: last.get(k) for k in META_KEYS if last.get(k) is not None}
+    return {"meta": meta, "current": current, "days": days, "daily": daily}
+
+
+def merge_history(data: dict, payload: dict) -> dict:
+    """把当天采集(payload)并进档案对象,返回新档案。
+
+    payload = {"meta": {...}, "current": {...}, "day": {...}, "daily": {...}}
 
     规则:
-      - daily 按天合并:新拉到的天覆盖同日旧值,窗口外的旧天保留
-        (xpGains 只返回最近约 15 天,更早的天数只存在于旧快照里)。
-      - 同日旧快照整体丢弃(一天一条,重跑覆盖),结果按日期升序。
-      - 防膨胀:全量 daily 只保留在最新快照,旧快照剥掉 daily;
-        页面对无明细的旧快照用 totalXp 差值兜底(见 src/pages/English.tsx)。
-      - sections/sessionCount/longestStreak 缺失时沿用上一份快照的值。
+      - meta 每次整体刷新(公开接口给的就是最新身份信息)
+      - current 逐键新值覆盖、缺失沿用旧值(接口偶发残缺不打掉页面)
+      - days 同日覆盖(一天一行,重跑覆盖),按日期升序
+      - daily 按天合并,同日冲突保留 lessons 更多的一份,同数取新
+        (xpGains 窗口按时间戳滚动,最老的那天重拉时只剩"边界时刻之后"的课,
+        直接新覆盖旧会把完整日写成残缺日——2026-08-20 实锤:
+        上午本地重跑把 8/5 从 18 课覆盖成 9 课)
     """
-    prev = history[-1] if history else None
-    if prev:
-        for k in CARRY_FORWARD_KEYS:
-            if not snapshot.get(k):
-                snapshot[k] = prev.get(k)
-
-    merged_daily: dict = {}
-    for old in history:
-        for d, v in (old.get("daily") or {}).items():
-            merged_daily[d] = v
-    for d, v in (snapshot.get("daily") or {}).items():
-        merged_daily[d] = v
-    if merged_daily:
-        snapshot["daily"] = dict(sorted(merged_daily.items()))
-
-    out = [
-        {k: v for k, v in h.items() if k != "daily"}
-        for h in history
-        if h["date"] != snapshot["date"]
-    ]
-    out.append(snapshot)
-    out.sort(key=lambda h: h["date"])
-    return out
+    data = migrate(data)
+    if payload.get("meta"):
+        data["meta"] = payload["meta"]
+    cur = data.setdefault("current", {})
+    for k in CARRY_FORWARD_KEYS:
+        v = (payload.get("current") or {}).get(k)
+        if v is not None:
+            cur[k] = v
+    day = payload["day"]
+    days = [d for d in data.get("days", []) if d.get("date") != day["date"]]
+    days.append(day)
+    days.sort(key=lambda d: d["date"])
+    data["days"] = days
+    merged = dict(data.get("daily") or {})
+    for d, v in (payload.get("daily") or {}).items():
+        old = merged.get(d)
+        # 同日冲突:正常场景是当天明细越重跑越全(新 ≥ 旧),取新;
+        # 窗口边缘的截断日新 < 旧,保留旧,不能让历史缩水
+        if not old or v.get("lessons", 0) >= old.get("lessons", 0):
+            merged[d] = v
+    data["daily"] = dict(sorted(merged.items()))
+    return data
 
 
 def normalize_token(raw: str) -> str:
@@ -185,8 +269,16 @@ def normalize_token(raw: str) -> str:
 
 def main():
     today = datetime.now(TZ).date().isoformat()
-    snapshot = fetch_public()
-    snapshot["date"] = today
+    pub = fetch_public()
+    day = {"date": today, "totalXp": pub["totalXp"], "streak": pub["streak"]}
+    payload = {
+        "meta": {
+            k: pub.get(k)
+            for k in META_KEYS
+            if pub.get(k) is not None
+        },
+        "day": day,
+    }
 
     # 若有 JWT,附带每日明细(xpGains 是约 15 天的滚动窗口,历史靠合并保留)
     token = normalize_token(os.environ.get("DUOLINGO_JWT") or "")
@@ -206,10 +298,17 @@ def main():
                 "Update the GitHub Secret, then re-run this workflow."
             )
         detail, extra = result
-        snapshot["daily"] = detail
-        snapshot["longestStreak"] = extra.get("longestStreak")
-        snapshot["sessionCount"] = extra.get("sessionCount")
-        snapshot["sections"] = extra.get("sections")
+        payload["daily"] = detail
+        score = extra.get("score") or {}
+        day["score"] = {
+            k: score[k] for k in ("reached", "lastUnitDone", "nextAtUnit") if score.get(k) is not None
+        }
+        payload["current"] = {
+            "longestStreak": extra.get("longestStreak"),
+            "sessionCount": extra.get("sessionCount"),
+            "sections": extra.get("sections"),
+            "scoreMax": score.get("max"),
+        }
         days = sorted(detail)
         if days:
             # 覆盖范围写进日志:接口窗口滞后时一眼可见(2026-08-16/17 断档排查了半天才发现是这)
@@ -224,21 +323,23 @@ def main():
                     "missing days will be backfilled by later runs once the API catches up",
                     file=sys.stderr,
                 )
-            # 覆盖范围同时记进快照:不用翻 Actions 日志,打开数据文件就能看到当时拉到了哪天
-            snapshot["apiCoverage"] = f"{days[0]}~{days[-1]}({len(days)}d)"
+            # 覆盖范围同时记进当天行:不用翻 Actions 日志,打开数据文件就能看到当时拉到了哪天
+            day["apiCoverage"] = f"{days[0]}~{days[-1]}({len(days)}d)"
         t = detail.get(today)
         if t:
             print(f"today: {t['lessons']} lessons ~{t['minutes']}min {t['xp']}xp")
 
-    history = []
+    data = {"meta": {}, "current": {}, "days": [], "daily": {}}
     if OUT.exists():
-        history = json.loads(OUT.read_text())
-
-    history = merge_history(history, snapshot)
+        data = json.loads(OUT.read_text())
+    data = merge_history(data, payload)
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(json.dumps(history, ensure_ascii=False, indent=2) + "\n")
-    print(f"Saved snapshot {today}: streak={snapshot['streak']} xp={snapshot['totalXp']} -> {OUT}")
+    OUT.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n")
+    score_part = ""
+    if day.get("score"):
+        score_part = f" score={day['score']['reached']}/{payload.get('current', {}).get('scoreMax')}"
+    print(f"Saved day {today}: streak={day['streak']} xp={day['totalXp']}{score_part} -> {OUT}")
 
 
 if __name__ == "__main__":

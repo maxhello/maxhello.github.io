@@ -37,10 +37,12 @@ python3 scripts/fetch-duolingo.py   # 手动跑多邻国采集(见下)
 ### 多邻国数据的关键设计
 
 - 双级数据源:公开接口(保底,无 token)+ JWT 明细(逐课 xpGains)。
-- **`xpGains` 是滚动窗口(约 15 天)**:脚本必须把新拉到的天与历史快照的 `daily` **合并**(新覆盖同日,旧保留),否则历史会缩水。此逻辑在 `fetch-duolingo.py` 的 `merge_history()`(有单测锁行为:`scripts/test_fetch_duolingo.py`)。
+- **档案是对象结构**(2026-08-20 从 list 改造,公共字段提升到外层):`{meta(静态身份: username/streakStart/learningLanguage), current(当前状态: sections/sessionCount/longestStreak/scoreMax,接口残缺时沿用旧值), days(纯时间序列: date/totalXp/streak/score/apiCoverage,一天一行,同日重跑覆盖), daily(近窗口流水账: {date: {lessons,minutes,xp}})}`。旧 list 文件由 `migrate()` 自动升级。消费方:本仓库 English.tsx / Now.tsx,以及 maxhello/maxhello 的 badge(读 `days[-1]` 的 date/streak/totalXp,已做双格式兼容)。
+- **`xpGains` 是滚动窗口(约 15 天,按时间戳不按天)**:脚本必须把新拉到的天与档案 `daily` **合并**,同日冲突**保留 lessons 更多的一份**——窗口最老的那天重拉时只剩"边界时刻之后"的课,直接新覆盖旧会把完整日写成残缺日(2026-08-20 实锤:上午重跑把 8/5 从 18 课覆盖成 9 课)。此逻辑在 `fetch-duolingo.py` 的 `merge_history()`(有单测锁行为:`scripts/test_fetch_duolingo.py`)。
 - **归日时区固定 `Asia/Shanghai`**(`TZ` 常量 + `day_key()`),不随运行环境变——本地(UTC+8)和 CI(UTC)结果必须一致。
-- **防膨胀**:全量 `daily` 只住在最新快照里,旧快照合并时剥掉 `daily`(页面用 totalXp 差值兜底);否则文件随天数平方增长且被打进前端 bundle。
+- **防膨胀**:`daily` 全量住顶层(近 15 天窗口,滑出的天靠合并保留);`current` 状态字段只有一份。文件一年 ~85KB 且全部进前端 bundle,别往 days 行塞每天不变的字段。
 - **JWT 设置了但拉取失败(如过期)直接 `exit 1`**,让 workflow 变红,绝不静默提交没有明细的快照。
+- **多邻国分数**:days 行的 `score` = `{reached, lastUnitDone, nextAtUnit}`,reached 来自 `currentCourse.scoreMetadata.reachedScore`(10~160,CEFR 对齐,接口原值),`lastUnitDone`/`nextAtUnit` 从 pathSectioned 算(最后完成单元、下一分单元带末单元),页面用它们做分数时间线和"下一分预估";满分在 `current.scoreMax`。分数是快变量,当天缺就缺,页面用最近一份兜底;2026-08-16~08-20 历史分数按单元进度回填(页面页脚注明)。
 - 本地跑脚本需 `DUOLINGO_INSECURE=1`(python.org 安装缺 CA)+ `DUOLINGO_JWT` 环境变量;CI 不需要 INSECURE。
 
 ### 配置集中

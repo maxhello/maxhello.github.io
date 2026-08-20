@@ -27,16 +27,16 @@ interface DayDetail {
   minutes: number
   xp: number
 }
-interface Snapshot {
-  totalXp: number
-  streak: number
-  streakStart: string
+// duolingo-history.json 顶层结构(2026-08-20 起:list → 对象)
+interface HistoryData {
+  meta: { streakStart?: string }
+  days: { date: string; totalXp: number; streak: number }[]
   daily?: Record<string, DayDetail>
 }
 
-const snaps = history as Snapshot[]
-const latest = snaps[snaps.length - 1]
-const last14 = Object.entries(latest.daily ?? {})
+const hist = history as HistoryData
+const latest = hist.days[hist.days.length - 1]
+const last14 = Object.entries(hist.daily ?? {})
   .sort(([a], [b]) => a.localeCompare(b))
   .slice(-14)
 const activeDays = last14.filter(([, v]) => v.xp > 0).length
@@ -63,9 +63,11 @@ export default function Now() {
       <Card>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="font-semibold text-cyan-300">🦉 Learning English</h2>
-          <span className="font-mono text-xs text-gray-500">
-            since {prettyDate(latest.streakStart)}
-          </span>
+          {hist.meta?.streakStart && (
+            <span className="font-mono text-xs text-gray-500">
+              since {prettyDate(hist.meta.streakStart)}
+            </span>
+          )}
         </div>
         <p className="leading-relaxed text-gray-300">
           Practicing Duolingo every day — a {latest.streak}-day streak so far and{' '}

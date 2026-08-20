@@ -15,22 +15,39 @@ interface Section {
   unitsCompleted: number
 }
 
-interface Snapshot {
-  username: string
-  totalXp: number
-  streak: number
-  streakStart: string
-  learningLanguage: string
-  daily?: Record<string, DayDetail>
-  longestStreak?: number
-  sessionCount?: number
-  sections?: Section[]
-  date: string
+interface ScoreInfo {
+  reached: number
+  lastUnitDone?: number
+  nextAtUnit?: number
 }
 
-const snaps = history as Snapshot[]
-const latest = snaps[snaps.length - 1]
-const first = snaps[0]
+/** days 数组元素:一天一行的纯时间序列 */
+interface DayRow {
+  date: string
+  totalXp: number
+  streak: number
+  score?: ScoreInfo
+  apiCoverage?: string
+}
+
+/** duolingo-history.json 顶层结构(2026-08-20 起:list → 对象) */
+interface HistoryData {
+  meta: { username?: string; streakStart?: string; learningLanguage?: string }
+  current: {
+    longestStreak?: number
+    sessionCount?: number
+    sections?: Section[]
+    scoreMax?: number
+  }
+  days: DayRow[]
+  daily?: Record<string, DayDetail>
+}
+
+const hist = history as HistoryData
+const rows = hist.days
+const latest = rows[rows.length - 1]
+const first = rows[0]
+const current = hist.current
 
 /** 访客本地日期(不能 toISOString:那是 UTC,北京时间早上 8 点前还是"昨天") */
 function localIsoDate(): string {
@@ -40,16 +57,16 @@ function localIsoDate(): string {
 }
 const todayIso = localIsoDate()
 
-/** 每日明细:最新快照的 daily 全量 + XP 差值兜底 */
+/** 每日明细:顶层 daily 全量 + XP 差值兜底(滑出窗口的老日子) */
 function dailyDetail(): Map<string, DayDetail> {
   const map = new Map<string, DayDetail>()
-  for (const [d, v] of Object.entries(latest.daily ?? {})) map.set(d, v)
-  snaps.forEach((s, i) => {
+  for (const [d, v] of Object.entries(hist.daily ?? {})) map.set(d, v)
+  rows.forEach((s, i) => {
     if (!map.has(s.date) && i > 0) {
       map.set(s.date, {
         lessons: 0,
         minutes: 0,
-        xp: Math.max(0, s.totalXp - snaps[i - 1].totalXp),
+        xp: Math.max(0, s.totalXp - rows[i - 1].totalXp),
       })
     }
   })
@@ -74,9 +91,60 @@ const weekMinutes = last7.reduce((s, d) => s + d.minutes, 0)
 const weekXp = last7.reduce((s, d) => s + d.xp, 0)
 const todayDetail = byDate.get(todayIso)
 
+/* —— 多邻国分数(10~160,CEFR 对齐,随课程进度/关卡测量浮动)—— */
+const scoreSnaps = rows.filter((s) => s.score?.reached != null)
+const scoreLatest = scoreSnaps[scoreSnaps.length - 1]
+const scoreNow = scoreLatest?.score?.reached
+const scoreMax = current.scoreMax
+const fmtDate = (d: string) =>
+  new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+const dayDiff = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000)
+
+/** 分数时间线:每档到达日 + 进入该档用了几天;首档之前没数据,exact=false 表示天数只是下限 */
+const scoreTimeline = scoreSnaps.reduce<
+  { score: number; since: string; tookDays: number | null; exact: boolean }[]
+>((acc, s) => {
+  const prev = acc[acc.length - 1]
+  if (prev && prev.score === s.score!.reached) return acc
+  acc.push({
+    score: s.score!.reached,
+    since: s.date,
+    tookDays: prev ? dayDiff(prev.since, s.date) : null,
+    // 上一档是"开记录时就已到达"的首档时,间隔天数不可知确切值
+    exact: acc.length >= 2,
+  })
+  return acc
+}, [])
+
+/** 下一分预估:剩余单元 ÷ 有记录以来的单元推进速度。数据不足/已满分时为 null,页面降级 */
+const scoreEta = (() => {
+  const last = scoreSnaps[scoreSnaps.length - 1]
+  const lastUnit = last?.score?.lastUnitDone
+  const nextUnit = last?.score?.nextAtUnit
+  if (lastUnit == null || nextUnit == null) return null
+  const remaining = nextUnit - lastUnit
+  if (remaining <= 0) return null
+  const withUnits = rows.filter((s) => s.score?.lastUnitDone != null)
+  const first = withUnits[0]
+  const firstUnit = first?.score?.lastUnitDone
+  if (firstUnit == null) return null
+  const span = dayDiff(first.date, last.date)
+  const gained = lastUnit - firstUnit
+  if (span < 1 || gained <= 0) return null
+  const pace = gained / span
+  const etaDays = Math.max(1, Math.round(remaining / pace))
+  const etaDate = new Date(Date.parse(last.date) + etaDays * 86_400_000)
+  return {
+    target: (last.score!.reached ?? 0) + 1,
+    remaining,
+    pace,
+    dateLabel: etaDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+  }
+})()
+
 /** CEFR 段:合并同名段 */
 function cefrSections(): { cefr: string; total: number; done: number }[] {
-  const raw = (latest.sections ?? []).filter((s) => s.cefr)
+  const raw = (current.sections ?? []).filter((s) => s.cefr)
   const merged = new Map<string, { cefr: string; total: number; done: number }>()
   for (const s of raw) {
     const cur = merged.get(s.cefr!) ?? { cefr: s.cefr!, total: 0, done: 0 }
@@ -189,6 +257,71 @@ function CefrMap() {
           </div>
         )
       })}
+    </div>
+  )
+}
+
+/** 多邻国分数块:嵌在 Hero 里,大数字 + 分数时间线 + 下一分预估 */
+function ScoreBlock() {
+  if (!scoreLatest) return null
+  const lastStep = scoreTimeline[scoreTimeline.length - 1]
+  return (
+    <div className="text-center">
+      <div className="flex items-baseline justify-center gap-1.5">
+        <span className="text-4xl font-bold heading-gradient">{scoreNow}</span>
+        <span className="text-xs text-gray-500">/ {scoreMax ?? '—'}</span>
+      </div>
+      <div className="mt-0.5 text-[10px] font-medium tracking-wider text-gray-500 uppercase">
+        Duolingo score
+      </div>
+      {/* 时间线:每档到达日(悬停看耗时),末端虚线 chip 是下一分预估 */}
+      <div className="mt-3 flex flex-wrap items-center justify-center gap-1">
+        {scoreTimeline.map((t, i) => {
+          const current = i === scoreTimeline.length - 1
+          const took =
+            t.tookDays != null ? `${t.exact ? '' : '≥'}${t.tookDays}d` : 'tracking started'
+          return (
+            <div key={t.score} className="flex items-center gap-1">
+              {i > 0 && <span className="text-[10px] text-gray-600">→</span>}
+              <div
+                title={`${t.score} · reached ${t.since} · ${took}`}
+                className={`rounded-md border px-2 py-0.5 text-center ${
+                  current
+                    ? 'border-violet-400/60 bg-violet-400/10'
+                    : 'border-cyan-400/40 bg-cyan-400/5'
+                }`}
+              >
+                <span
+                  className={`font-mono text-xs font-bold ${
+                    current ? 'text-violet-300' : 'text-cyan-300'
+                  }`}
+                >
+                  {t.score}
+                </span>
+                <span className="ml-1 text-[9px] text-gray-500">{fmtDate(t.since)}</span>
+              </div>
+            </div>
+          )
+        })}
+        {scoreEta && (
+          <div
+            title={`estimated ${scoreEta.target} · ${scoreEta.remaining} units left · ~${scoreEta.pace.toFixed(1)} units/day`}
+            className="rounded-md border border-dashed border-violet-400/40 px-2 py-0.5 text-center"
+          >
+            <span className="font-mono text-xs font-bold text-violet-300/70">
+              ≈{scoreEta.target}
+            </span>
+            <span className="ml-1 text-[9px] text-gray-500">{scoreEta.dateLabel}</span>
+          </div>
+        )}
+      </div>
+      <div className="mt-2 text-[10px] text-gray-500">
+        {scoreEta
+          ? `next ${scoreEta.target} · ${scoreEta.remaining} units · ~${scoreEta.pace.toFixed(1)}/day`
+          : lastStep
+            ? `reached ${fmtDate(lastStep.since)}`
+            : ''}
+      </div>
     </div>
   )
 }
@@ -369,7 +502,7 @@ export default function English() {
         </SectionSubtitle>
       </div>
 
-      {/* Hero:今日数据 + 课程进度环 */}
+      {/* Hero:今日数据 + 多邻国分数 + 课程进度环 */}
       <Card className="flex flex-col items-center gap-8 p-6 sm:flex-row sm:justify-around">
         <div className="text-center sm:text-left">
           <div className="font-mono text-xs text-gray-500">TODAY · {todayIso}</div>
@@ -407,6 +540,7 @@ export default function English() {
             <p className="mt-3 text-sm text-gray-500">No lessons yet today 🦉</p>
           )}
         </div>
+        <ScoreBlock />
         {totalUnits > 0 && (
           <ProgressRing pct={coursePct} label={`${coursePct}%`} sub={`course · ${doneUnits}/${totalUnits} units`} />
         )}
@@ -432,7 +566,7 @@ export default function English() {
         />
         <Stat value={`${weekMinutes} min`} label={`last 7 days (${weekXp} XP)`} />
         <Stat value={`~${avgMinutes} min`} label="avg / active day" />
-        <Stat value={String(latest.sessionCount ?? '—')} label="lifetime lessons" />
+        <Stat value={String(current.sessionCount ?? '—')} label="lifetime lessons" />
         <Stat
           value={bestDay ? `${bestDay.xp}` : '—'}
           label={bestDay ? `best day (${bestDay.date.slice(5)})` : 'best day'}
@@ -500,7 +634,9 @@ export default function English() {
 
       <p className="text-sm text-gray-500">
         Data source: Duolingo API (updated daily via GitHub Actions). Longest streak{' '}
-        {latest.longestStreak ?? latest.streak} · duration estimated from lesson timestamps 🦉
+        {current.longestStreak ?? latest.streak} · duration estimated from lesson timestamps. Score
+        tracked since Aug 16 — earlier moves unrecorded, Aug 16–20 reconstructed from unit
+        progress 🦉
       </p>
     </div>
   )
