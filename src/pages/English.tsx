@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import history from '../../data/duolingo-history.json'
 import { Card, SectionTitle, SectionSubtitle } from '../components/ui'
 import { usePageTitle } from '../hooks/usePageTitle'
@@ -57,23 +57,8 @@ function localIsoDate(): string {
 }
 const todayIso = localIsoDate()
 
-/** 每日明细:顶层 daily 全量 + XP 差值兜底(滑出窗口的老日子) */
-function dailyDetail(): Map<string, DayDetail> {
-  const map = new Map<string, DayDetail>()
-  for (const [d, v] of Object.entries(hist.daily ?? {})) map.set(d, v)
-  rows.forEach((s, i) => {
-    if (!map.has(s.date) && i > 0) {
-      map.set(s.date, {
-        lessons: 0,
-        minutes: 0,
-        xp: Math.max(0, s.totalXp - rows[i - 1].totalXp),
-      })
-    }
-  })
-  return map
-}
-
-const days = [...dailyDetail().entries()]
+/** 每日明细只认 daily(xpGains 归日生成)。当天 key 要等明细同步才有 —— 没有就整行不展示,不用 totalXp 差值兜底(差值窗口横跨前一晚,会把昨晚的 XP 算成今天的) */
+const days = Object.entries(hist.daily ?? {})
   .sort(([a], [b]) => a.localeCompare(b))
   .map(([date, v]) => ({ date, ...v }))
 const byDate = new Map(days.map((d) => [d.date, d]))
@@ -172,88 +157,116 @@ function useCountUp(target: number, ms = 900): number {
   return n
 }
 
-/** 环形进度:SVG 描边动画 */
-function ProgressRing({ pct, label, sub }: { pct: number; label: string; sub: string }) {
+/** 环形进度:SVG 描边动画(useId:页面会有多个环,渐变 id 不能撞;sm 版嵌在 CEFR 段序列里) */
+function ProgressRing({
+  pct,
+  label,
+  sub,
+  size = 'lg',
+}: {
+  pct: number
+  label: string
+  sub: string
+  size?: 'sm' | 'lg'
+}) {
   const [on, setOn] = useState(false)
+  const gid = useId()
   useEffect(() => {
     const t = setTimeout(() => setOn(true), 100)
     return () => clearTimeout(t)
   }, [])
   const R = 54
   const C = 2 * Math.PI * R
+  const box = size === 'sm' ? 'size-32' : 'size-36'
+  const sw = size === 'sm' ? 9 : 8
   return (
-    <div className="relative flex size-36 items-center justify-center">
-      <svg viewBox="0 0 128 128" className="size-36 -rotate-90">
-        <circle cx="64" cy="64" r={R} fill="none" strokeWidth="8" className="stroke-gray-800" />
+    <div className={`relative flex items-center justify-center ${box}`}>
+      <svg viewBox="0 0 128 128" className={`${box} -rotate-90`}>
+        <circle cx="64" cy="64" r={R} fill="none" strokeWidth={sw} className="stroke-gray-800" />
         <circle
           cx="64"
           cy="64"
           r={R}
           fill="none"
-          strokeWidth="8"
+          strokeWidth={sw}
           strokeLinecap="round"
-          stroke="url(#ringGrad)"
+          stroke={`url(#${gid})`}
           strokeDasharray={C}
           strokeDashoffset={on ? C * (1 - pct / 100) : C}
           style={{ transition: 'stroke-dashoffset 1.2s cubic-bezier(0.22,1,0.36,1)' }}
         />
         <defs>
-          <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+          <linearGradient id={gid} x1="0" y1="0" x2="1" y2="1">
             <stop offset="0%" stopColor="#22d3ee" />
             <stop offset="100%" stopColor="#a78bfa" />
           </linearGradient>
         </defs>
       </svg>
-      <div className="absolute text-center">
+      <div className="absolute px-2 text-center">
         <div className="text-2xl font-bold heading-gradient">{label}</div>
-        <div className="mt-0.5 text-[10px] text-gray-500">{sub}</div>
+        <div className="mt-0.5 truncate text-[10px] text-gray-500">{sub}</div>
       </div>
     </div>
   )
 }
 
-/** CEFR 关卡地图 */
+/** 当前段预计完成日:剩余单元 ÷ 单元推进速度(与下一分预估同款 pace) */
+function sectionEta(s: { total: number; done: number }): string | null {
+  if (!scoreEta || s.total <= s.done) return null
+  const daysLeft = Math.max(1, Math.round((s.total - s.done) / scoreEta.pace))
+  const d = new Date(Date.parse(latest.date) + daysLeft * 86_400_000)
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+/** CEFR 关卡地图:当前段位置直接是进度圆环,其余段小 chip */
 function CefrMap() {
   const secs = cefrSections()
   if (secs.length === 0) return null
   // 当前所在:第一个未完成的段
   const currentIdx = secs.findIndex((s) => s.done < s.total)
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-5">
       {secs.map((s, i) => {
         const complete = s.done >= s.total
         const current = i === currentIdx
         const pct = s.total > 0 ? Math.round((s.done / s.total) * 100) : 0
+        const eta = current ? sectionEta(s) : null
         return (
           <div key={s.cefr} className="flex items-center gap-2">
             {i > 0 && <span className="text-gray-700">→</span>}
-            <div
-              title={`${s.cefr}: ${s.done}/${s.total} units`}
-              className={`relative overflow-hidden rounded-lg border px-3 py-2 text-center transition-all ${
-                complete
-                  ? 'border-cyan-400/60 bg-cyan-400/10 shadow-[0_0_16px_-6px_rgba(34,211,238,0.6)]'
-                  : current
-                    ? 'border-violet-400/60 bg-violet-400/10 animate-pulse'
-                    : 'border-gray-800 bg-gray-900/40 opacity-60'
-              }`}
-            >
+            {current ? (
+              <div className="flex flex-col items-center gap-1.5">
+                <ProgressRing
+                  size="sm"
+                  pct={pct}
+                  label={`${pct}%`}
+                  sub={`${s.cefr} · ${s.done}/${s.total}`}
+                />
+                <div className="text-[10px] text-gray-500">
+                  {s.total - s.done} units to go{eta ? ` · ETA ${eta}` : ''}
+                </div>
+              </div>
+            ) : (
               <div
-                className={`font-mono text-sm font-bold ${
-                  complete ? 'text-cyan-300' : current ? 'text-violet-300' : 'text-gray-500'
+                title={`${s.cefr}: ${s.done}/${s.total} units`}
+                className={`rounded-lg border px-3 py-2 text-center transition-all ${
+                  complete
+                    ? 'border-cyan-400/60 bg-cyan-400/10 shadow-[0_0_16px_-6px_rgba(34,211,238,0.6)]'
+                    : 'border-gray-800 bg-gray-900/40 opacity-60'
                 }`}
               >
-                {s.cefr}
-              </div>
-              <div className="text-[10px] text-gray-500">
-                {complete ? 'done' : current ? `${pct}%` : 'locked'}
-              </div>
-              {current && s.total > 0 && (
                 <div
-                  className="absolute bottom-0 left-0 h-0.5 bg-violet-400 transition-all duration-1000"
-                  style={{ width: `${pct}%` }}
-                />
-              )}
-            </div>
+                  className={`font-mono text-sm font-bold ${
+                    complete ? 'text-cyan-300' : 'text-gray-500'
+                  }`}
+                >
+                  {s.cefr}
+                </div>
+                <div className="text-[10px] text-gray-500">
+                  {complete ? 'done' : `${s.total} units`}
+                </div>
+              </div>
+            )}
           </div>
         )
       })}
@@ -541,12 +554,18 @@ export default function English() {
           )}
         </div>
         <ScoreBlock />
-        {totalUnits > 0 && (
+        {scoreNow != null && scoreMax ? (
+          <ProgressRing
+            pct={Math.round((scoreNow / scoreMax) * 100)}
+            label={`${Math.round((scoreNow / scoreMax) * 100)}%`}
+            sub={`score · ${scoreNow}/${scoreMax}`}
+          />
+        ) : totalUnits > 0 ? (
           <ProgressRing pct={coursePct} label={`${coursePct}%`} sub={`course · ${doneUnits}/${totalUnits} units`} />
-        )}
+        ) : null}
       </Card>
 
-      {/* CEFR 地图 */}
+      {/* CEFR 地图:当前段即圆环 */}
       {secs.length > 0 && (
         <Card>
           <h2 className="mb-4 text-sm font-medium text-gray-300">CEFR journey</h2>
