@@ -19,7 +19,7 @@ jobs:
   snapshot:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Fetch Duolingo snapshot
         run: python3 scripts/fetch-duolingo.py
