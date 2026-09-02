@@ -339,28 +339,29 @@ function ScoreBlock() {
   )
 }
 
-/** 渐变面积图:XP 面积 + 时长折线,悬停十字线 */
+/** 渐变面积图:最近 30 天,XP 面积 + 时长折线,悬停十字线 */
 function DailyChart() {
   const [hover, setHover] = useState<number | null>(null)
   const ref = useRef<SVGSVGElement>(null)
+  const view = days.slice(-30)
   const W = 660
   const H = 190
   const PAD = 10
-  const maxXp = Math.max(50, ...days.map((d) => d.xp))
-  const maxMin = Math.max(30, ...days.map((d) => d.minutes))
-  const bw = W / days.length
+  const maxXp = Math.max(50, ...view.map((d) => d.xp))
+  const maxMin = Math.max(30, ...view.map((d) => d.minutes))
+  const bw = W / view.length
   const px = (i: number) => i * bw + bw / 2
   // X 轴标签密度:每个标签约占 46px 宽,按天数抽稀
-  const xLabelEvery = Math.max(1, Math.ceil(days.length / (W / 46)))
+  const xLabelEvery = Math.max(1, Math.ceil(view.length / (W / 46)))
   const pyXp = (v: number) => H - PAD - (v / maxXp) * (H - PAD * 2)
   const pyMin = (v: number) => H - PAD - (v / maxMin) * (H - PAD * 2)
 
   const areaPath =
-    `M ${px(0)},${pyXp(days[0].xp)} ` +
-    days.map((d, i) => `L ${px(i)},${pyXp(d.xp)}`).join(' ') +
-    ` L ${px(days.length - 1)},${H - PAD} L ${px(0)},${H - PAD} Z`
-  const linePath = days.map((d, i) => `${px(i)},${pyMin(d.minutes)}`).join(' L ')
-  const hoverD = hover !== null ? days[hover] : null
+    `M ${px(0)},${pyXp(view[0].xp)} ` +
+    view.map((d, i) => `L ${px(i)},${pyXp(d.xp)}`).join(' ') +
+    ` L ${px(view.length - 1)},${H - PAD} L ${px(0)},${H - PAD} Z`
+  const linePath = view.map((d, i) => `${px(i)},${pyMin(d.minutes)}`).join(' L ')
+  const hoverD = hover !== null ? view[hover] : null
 
   /** 指针/手指横坐标 → 天索引,越界置空(鼠标与触屏共用) */
   const locate = (clientX: number) => {
@@ -368,7 +369,7 @@ function DailyChart() {
     if (!rect) return
     const x = ((clientX - rect.left) / rect.width) * W
     const i = Math.floor(x / bw)
-    setHover(i >= 0 && i < days.length ? i : null)
+    setHover(i >= 0 && i < view.length ? i : null)
   }
 
   return (
@@ -393,7 +394,7 @@ function DailyChart() {
       {/* XP 面积 + 顶线 */}
       <path d={areaPath} fill="url(#xpArea)" />
       <path
-        d={`M ${days.map((d, i) => `${px(i)},${pyXp(d.xp)}`).join(' L ')}`}
+        d={`M ${view.map((d, i) => `${px(i)},${pyXp(d.xp)}`).join(' L ')}`}
         fill="none"
         stroke="#22d3ee"
         strokeWidth="2"
@@ -453,7 +454,7 @@ function DailyChart() {
       )}
       <line x1={0} y1={H - PAD} x2={W} y2={H - PAD} className="stroke-gray-700" strokeWidth="1" />
       {/* X 轴日期:隔 N 天标一个,每天画小刻度 */}
-      {days.map((d, i) => (
+      {view.map((d, i) => (
         <g key={`x-${d.date}`}>
           <line
             x1={px(i)}
@@ -595,7 +596,10 @@ export default function English() {
       {/* 每日活动图 */}
       <Card>
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-medium text-gray-300">Daily activity</h2>
+          <h2 className="flex items-baseline gap-2 text-sm font-medium text-gray-300">
+            Daily activity
+            <span className="text-xs font-normal text-gray-500">last 30 days</span>
+          </h2>
           <span className="flex items-center gap-2 text-xs text-gray-500">
             <span className="inline-block size-2 rounded-full bg-cyan-400" /> XP
             <span className="ml-2 inline-block size-2 rounded-full bg-violet-400" /> minutes
