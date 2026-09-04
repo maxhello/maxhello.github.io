@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import history from '../../data/duolingo-history.json'
 import { Card, SectionTitle, SectionSubtitle } from '../components/ui'
 import { usePageTitle } from '../hooks/usePageTitle'
@@ -75,6 +75,26 @@ const last7 = days.slice(-7)
 const weekMinutes = last7.reduce((s, d) => s + d.minutes, 0)
 const weekXp = last7.reduce((s, d) => s + d.xp, 0)
 const todayDetail = byDate.get(todayIso)
+
+/** 绿墙日历序列:对齐到周一列首,首尾与中间缺口补 0-XP 灰格(采集缺天不再错位整列周几) */
+const wallDays = (() => {
+  if (days.length === 0) return []
+  const iso = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  const cur = new Date(days[0].date + 'T00:00:00')
+  cur.setDate(cur.getDate() - ((cur.getDay() + 6) % 7)) // 回退到本周周一
+  const end = new Date(days[days.length - 1].date + 'T00:00:00')
+  const out: typeof days = []
+  while (cur <= end) {
+    const k = iso(cur)
+    out.push(byDate.get(k) ?? { date: k, lessons: 0, minutes: 0, xp: 0 })
+    cur.setDate(cur.getDate() + 1)
+  }
+  return out
+})()
+
+/** 绿墙行标签:第 1/3/5 行(Mon/Wed/Fri),GitHub 式 */
+const WALL_ROW_LABELS = ['Mon', '', 'Wed', '', 'Fri', '', '']
 
 /* —— 多邻国分数(10~160,CEFR 对齐,随课程进度/关卡测量浮动)—— */
 const scoreSnaps = rows.filter((s) => s.score?.reached != null)
@@ -490,6 +510,54 @@ function Stat({ value, label }: { value: string; label: string }) {
   )
 }
 
+/** 打卡绿墙:日历周对齐(周一起始),列数无上限;初始滚动到最右(最新一周),更早的向左滑查看 */
+function ActivityWall() {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const el = scrollRef.current
+    if (el) el.scrollLeft = el.scrollWidth // 绘制前锚定右端,避免先渲染最老几周再跳
+  }, [])
+  if (wallDays.length === 0) return null
+  return (
+    <div className="flex gap-2">
+      <div className="flex shrink-0 flex-col gap-1 text-[9px] leading-none text-gray-600">
+        {WALL_ROW_LABELS.map((l, i) => (
+          <span key={i} className="flex h-3.5 items-center">
+            {l}
+          </span>
+        ))}
+      </div>
+      <div ref={scrollRef} className="flex gap-1 overflow-x-auto pb-1">
+        {Array.from({ length: Math.ceil(wallDays.length / 7) }, (_, w) => (
+          <div key={w} className="flex flex-col gap-1">
+            {wallDays.slice(w * 7, w * 7 + 7).map((d) => {
+              const lvl =
+                d.xp <= 0
+                  ? 'bg-gray-800'
+                  : d.xp < 200
+                    ? 'bg-emerald-900'
+                    : d.xp < 500
+                      ? 'bg-emerald-700'
+                      : d.xp < 800
+                        ? 'bg-emerald-500'
+                        : 'bg-emerald-300'
+              return (
+                <div
+                  key={d.date}
+                  title={`${d.date}: ${d.xp} XP, ~${d.minutes} min`}
+                  className={`size-3.5 rounded-sm transition-transform hover:scale-150 ${lvl} ${
+                    d.date === todayIso ? 'animate-pulse ring-1 ring-cyan-300' : ''
+                  }`}
+                />
+              )
+            })}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function English() {
   usePageTitle('English')
   const streakN = useCountUp(latest?.streak ?? 0)
@@ -614,36 +682,10 @@ export default function English() {
         )}
       </Card>
 
-      {/* 打卡绿墙 */}
+      {/* 打卡绿墙:日历周对齐,初始锚定最新一周 */}
       <Card>
         <h2 className="mb-3 text-sm font-medium text-gray-300">Activity</h2>
-        <div className="flex gap-1 overflow-x-auto pb-1">
-          {Array.from({ length: Math.ceil(days.length / 7) }, (_, w) => (
-            <div key={w} className="flex flex-col gap-1">
-              {days.slice(w * 7, w * 7 + 7).map((d) => {
-                const lvl =
-                  d.xp <= 0
-                    ? 'bg-gray-800'
-                    : d.xp < 200
-                      ? 'bg-emerald-900'
-                      : d.xp < 500
-                        ? 'bg-emerald-700'
-                        : d.xp < 800
-                          ? 'bg-emerald-500'
-                          : 'bg-emerald-300'
-                return (
-                  <div
-                    key={d.date}
-                    title={`${d.date}: ${d.xp} XP, ~${d.minutes} min`}
-                    className={`size-3.5 rounded-sm transition-transform hover:scale-150 ${lvl} ${
-                      d.date === todayIso ? 'animate-pulse ring-1 ring-cyan-300' : ''
-                    }`}
-                  />
-                )
-              })}
-            </div>
-          ))}
-        </div>
+        <ActivityWall />
         <div className="mt-3 flex items-center gap-2 text-xs text-gray-500">
           Less
           <span className="size-3 rounded-sm bg-gray-800" />
