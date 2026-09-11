@@ -11,47 +11,65 @@
       {
         "cefr": "Intro",
         "unitsTotal": 10,
-        "unitsCompleted": 10
+        "unitsCompleted": 10,
+        "scoreMin": 5,
+        "scoreMax": 9
       },
       {
         "cefr": "A1",
         "unitsTotal": 30,
-        "unitsCompleted": 22
+        "unitsCompleted": 22,
+        "scoreMin": 10,
+        "scoreMax": 19
       },
       {
         "cefr": "A1",
         "unitsTotal": 30,
-        "unitsCompleted": 0
+        "unitsCompleted": 0,
+        "scoreMin": 20,
+        "scoreMax": 29
       },
       {
         "cefr": "A2",
         "unitsTotal": 60,
-        "unitsCompleted": 0
+        "unitsCompleted": 0,
+        "scoreMin": 30,
+        "scoreMax": 59
       },
       {
         "cefr": "B1",
         "unitsTotal": 255,
-        "unitsCompleted": 0
+        "unitsCompleted": 0,
+        "scoreMin": 60,
+        "scoreMax": 79
       },
       {
         "cefr": "B1",
         "unitsTotal": 260,
-        "unitsCompleted": 0
+        "unitsCompleted": 0,
+        "scoreMin": 80,
+        "scoreMax": 99
       },
       {
         "cefr": "B2",
         "unitsTotal": 180,
-        "unitsCompleted": 0
+        "unitsCompleted": 0,
+        "scoreMin": 100,
+        "scoreMax": 114
       },
       {
         "cefr": "B2",
         "unitsTotal": 180,
-        "unitsCompleted": 0
+        "unitsCompleted": 0,
+        "scoreMin": 115,
+        "scoreMax": 128
       },
       {
         "cefr": null,
         "unitsTotal": 1,
-        "unitsCompleted": 0
+        "unitsCompleted": 0,
+        "scoreMin": 129,
+        "scoreMax": 129
       }
     ],
     "scoreMax": 129
@@ -78,9 +96,9 @@
       "date": "2026-08-17",
       "apiCoverage": "2026-08-03~2026-08-17(15d)",
       "score": {
-        "reached": 11,
+        "reached": 12,
         "lastUnitDone": 15,
-        "nextAtUnit": 15
+        "nextAtUnit": 18
       }
     },
     {
@@ -354,6 +372,7 @@
       "score": {
         "reached": 17,
         "lastUnitDone": 31,
+        "bandStart": 31,
         "nextAtUnit": 33
       },
       "apiCoverage": "2026-08-27~2026-09-11(16d)"
@@ -587,6 +606,9 @@
     "31": "2026-09-10"
   },
   "scoreReached": {
+    "12": "2026-08-17",
+    "13": "2026-08-21",
+    "14": "2026-08-24",
     "15": "2026-08-29",
     "16": "2026-09-03",
     "17": "2026-09-08"

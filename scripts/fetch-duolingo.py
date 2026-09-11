@@ -64,19 +64,28 @@ def get_json(url, auth=None):
 
 
 def fetch_course_progress(u):
-    """从带 JWT 的完整档案提取课程进度:各 CEFR 段的单元完成情况。"""
+    """从带 JWT 的完整档案提取课程进度:各 CEFR 段的单元完成情况 + 该段覆盖的分数区间。
+
+    scoreMin/scoreMax 来自段内单元的 unit_score(实测 Intro 5~9、A1 10~29、A2 30~59、
+    B1 60~99、B2 100~128),页面用它画"当前段分数区间"的走势图和"下一段起始分"。
+    同一 CEFR 名可能拆成多段(A1 就是两段),页面按名合并。
+    """
     sections = []
     for sec in ((u.get("currentCourse") or {}).get("pathSectioned") or []):
         units = sec.get("units", [])
         if not units:
             continue
-        sections.append(
-            {
-                "cefr": units[0].get("cefrLevel"),
-                "unitsTotal": len(units),
-                "unitsCompleted": sec.get("completedUnits") or 0,
-            }
-        )
+        row = {
+            "cefr": units[0].get("cefrLevel"),
+            "unitsTotal": len(units),
+            "unitsCompleted": sec.get("completedUnits") or 0,
+        }
+        scores = [unit_score(x) for x in units]
+        scores = [x for x in scores if x is not None]
+        if scores:
+            row["scoreMin"] = min(scores)
+            row["scoreMax"] = max(scores)
+        sections.append(row)
     return sections
 
 
@@ -88,6 +97,8 @@ def extract_score_info(current_course):
     - reached:当前分数(scoreMetadata.reachedScore,接口原值,无计算)
     - lastUnitDone:最后已完成单元的全局 unitIndex。路径线性解锁,
       每段完成的必是前 N 个单元,取第 N 个的 unitIndex
+    - bandStart:当前分数带的首单元(全局 unitIndex),页面用 (lastUnitDone-bandStart+1)/(nextAtUnit-bandStart+1)
+      画"本档进度条"(Duolingo 自家 UI 就是当前分→下一分的进度条)
     - nextAtUnit:"完成它就到下一分"的单元(全局 unitIndex)。
       节点级 levelScoreInfo.reachedScore = 学这个单元时持有的分数,一个单元内所有节点相同,
       分数只在单元切换时跳变——所以要取当前分数带的最后一个单元,
@@ -115,6 +126,7 @@ def extract_score_info(current_course):
             idx = unit.get("unitIndex")
             if idx is not None and unit_score(unit) == score:
                 info["nextAtUnit"] = max(info.get("nextAtUnit", 0), idx)
+                info["bandStart"] = min(info.get("bandStart", idx), idx)
     return info
 
 
@@ -393,7 +405,9 @@ def main():
         payload["daily"] = detail
         score = extra.get("score") or {}
         day["score"] = {
-            k: score[k] for k in ("reached", "lastUnitDone", "nextAtUnit") if score.get(k) is not None
+            k: score[k]
+            for k in ("reached", "lastUnitDone", "bandStart", "nextAtUnit")
+            if score.get(k) is not None
         }
         payload["current"] = {
             "longestStreak": extra.get("longestStreak"),

@@ -13,11 +13,16 @@ interface Section {
   cefr: string | null
   unitsTotal: number
   unitsCompleted: number
+  /** 该段覆盖的分数区间(2026-09-11 起采集;实测 A1 10~29、A2 30~59、B1 60~99、B2 100~128) */
+  scoreMin?: number
+  scoreMax?: number
 }
 
 interface ScoreInfo {
   reached: number
   lastUnitDone?: number
+  /** 当前分数带的首单元(2026-09-11 起采集;老行没有,页面按首次出现该分数的行推) */
+  bandStart?: number
   nextAtUnit?: number
 }
 
@@ -118,7 +123,7 @@ const scoreFirstSeen = scoreSnaps.reduce<Record<number, string>>((acc, s) => {
 const scoreReached = hist.scoreReached ?? {}
 
 /** 分数时间线:每档到达日 + 进入该档用了几天。
- *  到达日优先取 scoreReached(逐课时间戳反推,精确到当天),没有的档退回快照首见日(approx)。
+ *  到达日优先取 scoreReached(逐课时间戳反推,精确到当天),没有的档退回快照首见日。
  *  首档之前没数据,exact=false 表示天数只是下限 */
 const scoreTimeline = Array.from(
   new Set([...Object.keys(scoreFirstSeen), ...Object.keys(scoreReached)].map(Number)),
@@ -126,7 +131,7 @@ const scoreTimeline = Array.from(
   .filter((v) => scoreNow == null || v <= scoreNow)
   .sort((a, b) => a - b)
   .reduce<
-    { score: number; since: string; approx: boolean; tookDays: number | null; exact: boolean }[]
+    { score: number; since: string; tookDays: number | null; exact: boolean }[]
   >((acc, v) => {
     const precise = scoreReached[String(v)]
     const since = precise ?? scoreFirstSeen[v]
@@ -135,7 +140,6 @@ const scoreTimeline = Array.from(
     acc.push({
       score: v,
       since,
-      approx: !precise,
       tookDays: prev ? dayDiff(prev.since, since) : null,
       // 上一档是"开记录时就已到达"的首档时,间隔天数不可知确切值
       exact: acc.length >= 2,
@@ -143,7 +147,8 @@ const scoreTimeline = Array.from(
     return acc
   }, [])
 
-/** 下一分预估:剩余单元 ÷ 有记录以来的单元推进速度。数据不足/已满分时为 null,页面降级 */
+/** 下一分预估:剩余单元 ÷ 有记录以来的单元推进速度,外加本档进度(done/total 单元)。
+ *  数据不足/已满分时为 null,页面降级 */
 const scoreEta = (() => {
   const last = scoreSnaps[scoreSnaps.length - 1]
   const lastUnit = last?.score?.lastUnitDone
@@ -151,6 +156,13 @@ const scoreEta = (() => {
   if (lastUnit == null || nextUnit == null) return null
   const remaining = nextUnit - lastUnit
   if (remaining <= 0) return null
+  // 本档首单元:新行直接带;老行退回"首次出现当前分数那行的 lastUnitDone + 1"
+  const firstAtScore = scoreSnaps.find((s) => s.score!.reached === last.score!.reached)
+  const bandStart = Math.min(
+    last.score!.bandStart ?? (firstAtScore?.score?.lastUnitDone ?? lastUnit) + 1,
+    lastUnit + 1,
+  )
+  const band = { done: lastUnit - bandStart + 1, total: nextUnit - bandStart + 1 }
   const withUnits = rows.filter((s) => s.score?.lastUnitDone != null)
   const first = withUnits[0]
   const firstUnit = first?.score?.lastUnitDone
@@ -164,23 +176,74 @@ const scoreEta = (() => {
   return {
     target: (last.score!.reached ?? 0) + 1,
     remaining,
+    band,
     pace,
+    date: etaDate.toISOString().slice(0, 10),
     dateLabel: etaDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
   }
 })()
 
 /** CEFR 段:合并同名段 */
-function cefrSections(): { cefr: string; total: number; done: number }[] {
+interface Level {
+  cefr: string
+  total: number
+  done: number
+  scoreMin?: number
+  scoreMax?: number
+}
+
+/** CEFR 段配色:数据编码色,按段固定不随排序变(Intro 暗青 → A1 青 → A2 蓝 → B1 紫 → B2 品红) */
+const CEFR_COLOR: Record<string, string> = {
+  Intro: '#155e75',
+  A1: '#22d3ee',
+  A2: '#60a5fa',
+  B1: '#a78bfa',
+  B2: '#e879f9',
+}
+const cefrColor = (cefr: string) => CEFR_COLOR[cefr] ?? '#a78bfa'
+
+/** 按 CEFR 名合并接口里的分段(A1/B1/B2 各拆成两段),单元数相加、分数区间取并 */
+function cefrSections(): Level[] {
   const raw = (current.sections ?? []).filter((s) => s.cefr)
-  const merged = new Map<string, { cefr: string; total: number; done: number }>()
+  const merged = new Map<string, Level>()
   for (const s of raw) {
     const cur = merged.get(s.cefr!) ?? { cefr: s.cefr!, total: 0, done: 0 }
     cur.total += s.unitsTotal
     cur.done += s.unitsCompleted
+    if (s.scoreMin != null) cur.scoreMin = Math.min(cur.scoreMin ?? s.scoreMin, s.scoreMin)
+    if (s.scoreMax != null) cur.scoreMax = Math.max(cur.scoreMax ?? s.scoreMax, s.scoreMax)
     merged.set(s.cefr!, cur)
   }
   return [...merged.values()]
 }
+const levels = cefrSections()
+
+/** 当前段:分数落在其区间内的段;没有分数时退回第一个未完成的段 */
+const levelNow =
+  levels.find(
+    (l) =>
+      scoreNow != null && l.scoreMin != null && l.scoreMax != null && scoreNow >= l.scoreMin && scoreNow <= l.scoreMax,
+  ) ??
+  levels.find((l) => l.done < l.total) ??
+  null
+const levelNext = levelNow ? (levels[levels.indexOf(levelNow) + 1] ?? null) : null
+
+/** 进入当前段的日期:段起始分的到达日(A2 起精确);早于建档的段退回最早落在段内的快照日(approx,文案带 +) */
+const levelSince = (() => {
+  if (!levelNow || levelNow.scoreMin == null || levelNow.scoreMax == null) return null
+  const exact = scoreReached[String(levelNow.scoreMin)]
+  if (exact) return { date: exact, approx: false }
+  const row = scoreSnaps.find(
+    (s) => s.score!.reached >= levelNow.scoreMin! && s.score!.reached <= levelNow.scoreMax!,
+  )
+  return row ? { date: row.date, approx: true } : null
+})()
+
+/** 当前段内的升分点(走势图只画这些) */
+const levelSteps = scoreTimeline.filter(
+  (t) =>
+    levelNow?.scoreMin != null && levelNow.scoreMax != null && t.score >= levelNow.scoreMin && t.score <= levelNow.scoreMax,
+)
 
 /** 数字滚动动画 */
 function useCountUp(target: number, ms = 900): number {
@@ -199,59 +262,6 @@ function useCountUp(target: number, ms = 900): number {
   return n
 }
 
-/** 环形进度:SVG 描边动画(useId:页面会有多个环,渐变 id 不能撞;sm 版嵌在 CEFR 段序列里) */
-function ProgressRing({
-  pct,
-  label,
-  sub,
-  size = 'lg',
-}: {
-  pct: number
-  label: string
-  sub: string
-  size?: 'sm' | 'lg'
-}) {
-  const [on, setOn] = useState(false)
-  const gid = useId()
-  useEffect(() => {
-    const t = setTimeout(() => setOn(true), 100)
-    return () => clearTimeout(t)
-  }, [])
-  const R = 54
-  const C = 2 * Math.PI * R
-  const box = size === 'sm' ? 'size-32' : 'size-36'
-  const sw = size === 'sm' ? 9 : 8
-  return (
-    <div className={`relative flex items-center justify-center ${box}`}>
-      <svg viewBox="0 0 128 128" className={`${box} -rotate-90`}>
-        <circle cx="64" cy="64" r={R} fill="none" strokeWidth={sw} className="stroke-gray-800" />
-        <circle
-          cx="64"
-          cy="64"
-          r={R}
-          fill="none"
-          strokeWidth={sw}
-          strokeLinecap="round"
-          stroke={`url(#${gid})`}
-          strokeDasharray={C}
-          strokeDashoffset={on ? C * (1 - pct / 100) : C}
-          style={{ transition: 'stroke-dashoffset 1.2s cubic-bezier(0.22,1,0.36,1)' }}
-        />
-        <defs>
-          <linearGradient id={gid} x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#22d3ee" />
-            <stop offset="100%" stopColor="#a78bfa" />
-          </linearGradient>
-        </defs>
-      </svg>
-      <div className="absolute px-2 text-center">
-        <div className="text-2xl font-bold heading-gradient">{label}</div>
-        <div className="mt-0.5 truncate text-[10px] text-gray-500">{sub}</div>
-      </div>
-    </div>
-  )
-}
-
 /** 当前段预计完成日:剩余单元 ÷ 单元推进速度(与下一分预估同款 pace) */
 function sectionEta(s: { total: number; done: number }): string | null {
   if (!scoreEta || s.total <= s.done) return null
@@ -260,126 +270,445 @@ function sectionEta(s: { total: number; done: number }): string | null {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-/** CEFR 关卡地图:当前段位置直接是进度圆环,其余段小 chip */
-function CefrMap() {
-  const secs = cefrSections()
-  if (secs.length === 0) return null
-  // 当前所在:第一个未完成的段
-  const currentIdx = secs.findIndex((s) => s.done < s.total)
+/** 首屏入场:挂载后延迟置 true,配合 CSS transition 做描边生长/淡入;reduced-motion 时由 motion-reduce 类直接呈现 */
+function useMounted(delay = 150): boolean {
+  const [on, setOn] = useState(false)
+  useEffect(() => {
+    const t = setTimeout(() => setOn(true), delay)
+    return () => clearTimeout(t)
+  }, [delay])
+  return on
+}
+
+/** Hero 中栏:当前 CEFR 段内的分数走势(AtCoder 评分图的画法)。
+ *  纵轴 = 当前段的分数区间(A1 10~30),背景铺本段色带、顶上一条下一段的提示带;
+ *  只画本段内的升分点,进 A2 后自动换区间。最后一点停在发生日并带光晕,不往今天拖。
+ *  下方文案:在本段第几天(A1 早于建档,天数是下限,带 +)、本段升了几次 */
+function ScoreBandChart() {
+  const [hover, setHover] = useState<number | null>(null)
+  const on = useMounted()
+  const ref = useRef<SVGSVGElement>(null)
+  const gid = useId()
+  if (!levelNow || levelNow.scoreMin == null || levelNow.scoreMax == null || levelSteps.length === 0)
+    return null
+  const steps = levelSteps
+  const W = 300
+  const H = 150
+  const L = 12
+  const R = 40
+  const T = 14
+  const B = 20
+  const yMin = levelNow.scoreMin
+  const yMax = levelNow.scoreMax + 1 // 上沿 = 下一段起始分
+  const x0 = Date.parse(steps[0].since)
+  const x1 = Date.parse(steps[steps.length - 1].since)
+  const plotW = W - L - R
+  const px = (d: string) => (x1 === x0 ? L + plotW / 2 : L + ((Date.parse(d) - x0) / (x1 - x0)) * plotW)
+  const py = (v: number) => H - B - ((v - yMin) / (yMax - yMin)) * (H - T - B)
+  const pts = steps.map((t) => [px(t.since), py(t.score)] as const)
+  const line = pts.map(([x, y]) => `${x},${y}`).join(' L ')
+  const length = pts.reduce(
+    (acc, [x, y], i) => (i ? acc + Math.hypot(x - pts[i - 1][0], y - pts[i - 1][1]) : 0),
+    0,
+  )
+  const color = cefrColor(levelNow.cefr)
+  const nextColor = levelNext ? cefrColor(levelNext.cefr) : '#a78bfa'
+  const tickStep = yMax - yMin <= 20 ? 5 : 10
+  const ticks: number[] = []
+  for (let v = yMin; v <= yMax; v += tickStep) ticks.push(v)
+  if (ticks[ticks.length - 1] !== yMax) ticks.push(yMax)
+  // 相邻点横向不到 14px 时标签放点右侧,错开不叠字(最低点贴基线,不能放下方)
+  const aside: boolean[] = []
+  pts.forEach(([x], i) => {
+    const close = i > 0 && x - pts[i - 1][0] < 14
+    aside.push(close && !aside[i - 1])
+  })
+  const locate = (clientX: number) => {
+    const rect = ref.current?.getBoundingClientRect()
+    if (!rect) return
+    const x = ((clientX - rect.left) / rect.width) * W
+    let best = 0
+    pts.forEach(([ptx], i) => {
+      if (Math.abs(ptx - x) < Math.abs(pts[best][0] - x)) best = i
+    })
+    setHover(Math.abs(pts[best][0] - x) <= 24 ? best : null)
+  }
+  const h = hover !== null ? steps[hover] : null
+  const dayN = levelSince ? dayDiff(levelSince.date, todayIso) + 1 : null
+
   return (
-    <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-5">
-      {secs.map((s, i) => {
-        const complete = s.done >= s.total
-        const current = i === currentIdx
-        const pct = s.total > 0 ? Math.round((s.done / s.total) * 100) : 0
-        const eta = current ? sectionEta(s) : null
-        return (
-          <div key={s.cefr} className="flex items-center gap-2">
-            {i > 0 && <span className="text-gray-700">→</span>}
-            {current ? (
-              <div className="flex flex-col items-center gap-1.5">
-                <ProgressRing
-                  size="sm"
-                  pct={pct}
-                  label={`${pct}%`}
-                  sub={`${s.cefr} · ${s.done}/${s.total}`}
-                />
-                <div className="text-[10px] text-gray-500">
-                  {s.total - s.done} units to go{eta ? ` · ETA ${eta}` : ''}
-                </div>
-              </div>
-            ) : (
-              <div
-                title={`${s.cefr}: ${s.done}/${s.total} units`}
-                className={`rounded-lg border px-3 py-2 text-center transition-all ${
-                  complete
-                    ? 'border-cyan-400/60 bg-cyan-400/10 shadow-[0_0_16px_-6px_rgba(34,211,238,0.6)]'
-                    : 'border-gray-800 bg-gray-900/40 opacity-60'
-                }`}
+    <div className="flex w-full min-w-0 max-w-[340px] flex-col items-center gap-1 justify-self-center">
+      <svg
+        ref={ref}
+        viewBox={`0 0 ${W} ${H}`}
+        className="w-full overflow-visible"
+        role="img"
+        aria-label={`Duolingo score within ${levelNow.cefr}`}
+        style={{ touchAction: 'pan-y' }}
+        onMouseLeave={() => setHover(null)}
+        onMouseMove={(e) => locate(e.clientX)}
+        onTouchStart={(e) => locate(e.touches[0].clientX)}
+        onTouchMove={(e) => locate(e.touches[0].clientX)}
+      >
+        <defs>
+          <linearGradient id={`${gid}-s`} x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor={color} />
+            <stop offset="100%" stopColor="#a78bfa" />
+          </linearGradient>
+          <filter id={`${gid}-g`} x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="2.5" />
+          </filter>
+        </defs>
+        {/* 本段色带:下半深、上半浅;顶上一条下一段提示带 */}
+        <rect x={L} y={py((yMin + yMax) / 2)} width={plotW + 6} height={py(yMin) - py((yMin + yMax) / 2)} fill={color} opacity="0.22" />
+        <rect x={L} y={py(yMax)} width={plotW + 6} height={py((yMin + yMax) / 2) - py(yMax)} fill={color} opacity="0.1" />
+        {levelNext && (
+          <>
+            <rect x={L} y={T - 8} width={plotW + 6} height={8} fill={nextColor} opacity="0.35" />
+            <text x={L + 4} y={T - 2} fontSize="8" fontWeight="bold" fill={nextColor}>
+              {levelNext.cefr} ↑
+            </text>
+          </>
+        )}
+        {ticks.map((v) => (
+          <g key={v}>
+            <line x1={L} y1={py(v)} x2={W - R + 6} y2={py(v)} stroke="#fff" opacity="0.06" />
+            <text x={W - R + 10} y={py(v) + 3} fontSize="8" fontFamily="ui-monospace, monospace" className="fill-gray-500">
+              {v}
+            </text>
+          </g>
+        ))}
+        <text x={W - R + 10} y={py((yMin + yMax) / 2) - 9} fontSize="9" fontWeight="bold" fill={color}>
+          {levelNow.cefr}
+        </text>
+        {/* 折线(描边生长)+ 点 + 标签(依次浮现) */}
+        {pts.length > 1 && (
+          <path
+            d={`M ${line}`}
+            fill="none"
+            stroke={`url(#${gid}-s)`}
+            strokeWidth="2"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            strokeDasharray={length}
+            strokeDashoffset={on ? 0 : length}
+            className="motion-reduce:transition-none"
+            style={{ transition: 'stroke-dashoffset 1.2s cubic-bezier(0.22,1,0.36,1)' }}
+          />
+        )}
+        {steps.map((t, i) => {
+          const last = i === steps.length - 1
+          const [x, y] = pts[i]
+          return (
+            <g
+              key={t.score}
+              className="transition-opacity duration-500 motion-reduce:transition-none"
+              style={{ opacity: on ? 1 : 0, transitionDelay: `${(i / Math.max(1, steps.length - 1)) * 1000}ms` }}
+            >
+              {last && (
+                <>
+                  <circle cx={x} cy={y} r="8" fill="#a78bfa" opacity="0.5" filter={`url(#${gid}-g)`} />
+                  <circle
+                    cx={x}
+                    cy={y}
+                    r="4"
+                    fill="none"
+                    stroke="#a78bfa"
+                    strokeWidth="1.5"
+                    className="animate-ping motion-reduce:animate-none"
+                    style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
+                  />
+                </>
+              )}
+              <circle
+                cx={x}
+                cy={y}
+                r={last ? 4 : hover === i ? 3.5 : 2.5}
+                fill={last ? '#c4b5fd' : color}
+                stroke="#0b1220"
+                strokeWidth="1"
+              />
+              <text
+                x={x + (aside[i] ? 6 : 0)}
+                y={y + (aside[i] ? 3 : -8)}
+                fontSize={last ? 10 : 8}
+                fontWeight={last ? 'bold' : 'normal'}
+                textAnchor={aside[i] ? 'start' : 'middle'}
+                fontFamily="ui-monospace, monospace"
+                className={last ? 'fill-violet-200' : 'fill-gray-400'}
               >
-                <div
-                  className={`font-mono text-sm font-bold ${
-                    complete ? 'text-cyan-300' : 'text-gray-500'
-                  }`}
-                >
-                  {s.cefr}
-                </div>
-                <div className="text-[10px] text-gray-500">
-                  {complete ? 'done' : `${s.total} units`}
-                </div>
-              </div>
-            )}
-          </div>
-        )
-      })}
+                {t.score}
+              </text>
+            </g>
+          )
+        })}
+        <line x1={L} y1={H - B} x2={W - R + 6} y2={H - B} className="stroke-gray-700" />
+        <text x={L} y={H - 7} fontSize="8" className="fill-gray-500">
+          {fmtDate(steps[0].since)}
+        </text>
+        {steps.length > 1 && (
+          <text x={pts[pts.length - 1][0]} y={H - 7} fontSize="8" textAnchor="end" className="fill-gray-500">
+            {fmtDate(steps[steps.length - 1].since)}
+          </text>
+        )}
+        {h && (
+          <g>
+            <line x1={px(h.since)} y1={T - 6} x2={px(h.since)} y2={H - B} stroke="#67e8f9" strokeWidth="1" strokeOpacity="0.5" />
+            {(() => {
+              const bw = 78
+              const bx = Math.min(Math.max(px(h.since) - bw / 2, 2), W - bw - 2)
+              const took = h.tookDays != null ? `${h.exact ? '' : '≥'}${h.tookDays}d` : 'tracking start'
+              return (
+                <g>
+                  <rect x={bx} y={0} width={bw} height={30} rx={5} fill="#0b1220" stroke="rgb(55 65 81)" />
+                  <text x={bx + bw / 2} y={12} textAnchor="middle" fontSize="9" fill="#22d3ee">
+                    {h.score} · {fmtDate(h.since)}
+                  </text>
+                  <text x={bx + bw / 2} y={24} textAnchor="middle" fontSize="9" fill="#9ca3af">
+                    {took}
+                  </text>
+                </g>
+              )
+            })()}
+          </g>
+        )}
+      </svg>
+      <div className="text-[11px] text-gray-500">
+        <span className="font-semibold" style={{ color }}>
+          {levelNow.cefr}
+        </span>
+        {dayN != null && (
+          <>
+            {' · day '}
+            <span className="font-mono text-gray-200">
+              {dayN}
+              {levelSince?.approx ? '+' : ''}
+            </span>
+          </>
+        )}
+        {` · ${steps.length} score-up${steps.length > 1 ? 's' : ''}`}
+      </div>
     </div>
   )
 }
 
-/** 多邻国分数块:嵌在 Hero 里,大数字 + 分数时间线 + 下一分预估 */
-function ScoreBlock() {
-  if (!scoreLatest) return null
-  const lastStep = scoreTimeline[scoreTimeline.length - 1]
+/** Hero 右栏:段位徽章(Valorant 段位的画法)。六边形里写当前段与分数,
+ *  外环按本档单元数分格、已完成的格子亮起(= 到下一分的进度),下方一行下一分预估 */
+function ScoreBadge() {
+  const on = useMounted(400)
+  const gid = useId()
+  if (scoreNow == null) return null
+  const W = 210
+  const H = 172
+  const cx = 105
+  const cy = 82
+  const R = 66
+  const circ = 2 * Math.PI * R
+  const band = scoreEta?.band ?? null
+  const segs = band ? band.total : 1
+  const seg = circ / segs
+  const gap = segs > 1 ? 5 : 0
+  const hex = (r: number) =>
+    Array.from({ length: 6 }, (_, i) => {
+      const a = Math.PI / 6 + (i * Math.PI) / 3
+      return `${cx + r * Math.cos(a)},${cy + r * Math.sin(a)}`
+    }).join(' ')
+  const cefr = levelNow?.cefr
   return (
-    <div className="text-center">
-      <div className="flex items-baseline justify-center gap-1.5">
-        <span className="text-4xl font-bold heading-gradient">{scoreNow}</span>
-        <span className="text-xs text-gray-500">/ {scoreMax ?? '—'}</span>
-      </div>
-      <div className="mt-0.5 text-[10px] font-medium tracking-wider text-gray-500 uppercase">
-        Duolingo score
-      </div>
-      {/* 时间线:每档到达日(悬停看耗时),末端虚线 chip 是下一分预估 */}
-      <div className="mt-3 flex flex-wrap items-center justify-center gap-1">
-        {scoreTimeline.map((t, i) => {
-          const current = i === scoreTimeline.length - 1
-          const took =
-            t.tookDays != null ? `${t.exact ? '' : '≥'}${t.tookDays}d` : 'tracking started'
-          const reached = t.approx ? `first seen ${t.since} (snapshot day)` : `reached ${t.since}`
-          return (
-            <div key={t.score} className="flex items-center gap-1">
-              {i > 0 && <span className="text-[10px] text-gray-600">→</span>}
-              <div
-                title={`${t.score} · ${reached} · ${took}`}
-                className={`rounded-md border px-2 py-0.5 text-center ${
-                  current
-                    ? 'border-violet-400/60 bg-violet-400/10'
-                    : 'border-cyan-400/40 bg-cyan-400/5'
-                }`}
-              >
-                <span
-                  className={`font-mono text-xs font-bold ${
-                    current ? 'text-violet-300' : 'text-cyan-300'
-                  }`}
-                >
-                  {t.score}
-                </span>
-                <span className="ml-1 text-[9px] text-gray-500">
-                  {t.approx ? '≈' : ''}
-                  {fmtDate(t.since)}
-                </span>
-              </div>
-            </div>
-          )
-        })}
-        {scoreEta && (
-          <div
-            title={`estimated ${scoreEta.target} · ${scoreEta.remaining} units left · ~${scoreEta.pace.toFixed(1)} units/day`}
-            className="rounded-md border border-dashed border-violet-400/40 px-2 py-0.5 text-center"
-          >
-            <span className="font-mono text-xs font-bold text-violet-300/70">
-              ≈{scoreEta.target}
-            </span>
-            <span className="ml-1 text-[9px] text-gray-500">{scoreEta.dateLabel}</span>
-          </div>
+    <div className="flex flex-col items-center gap-0.5">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-[184px] max-w-full overflow-visible" role="img" aria-label={`Duolingo score ${scoreNow}`}>
+        <defs>
+          <linearGradient id={`${gid}-g`} x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#22d3ee" />
+            <stop offset="100%" stopColor="#a78bfa" />
+          </linearGradient>
+          <radialGradient id={`${gid}-f`}>
+            <stop offset="0%" stopColor="#1e2a4a" />
+            <stop offset="100%" stopColor="#0b1220" />
+          </radialGradient>
+          <filter id={`${gid}-b`} x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="6" />
+          </filter>
+        </defs>
+        {/* 环底轨:按本档单元数分格 */}
+        {Array.from({ length: segs }, (_, i) => (
+          <circle
+            key={`t-${i}`}
+            cx={cx}
+            cy={cy}
+            r={R}
+            fill="none"
+            className="stroke-gray-800"
+            strokeWidth="7"
+            strokeLinecap="round"
+            strokeDasharray={`${seg - gap} ${circ}`}
+            strokeDashoffset={-(i * seg)}
+            transform={`rotate(-90 ${cx} ${cy})`}
+          />
+        ))}
+        {/* 已完成的格子:渐变 + 光晕,依次亮起 */}
+        {band &&
+          Array.from({ length: band.done }, (_, i) => (
+            <g
+              key={`d-${i}`}
+              className="transition-opacity duration-500 motion-reduce:transition-none"
+              style={{ opacity: on ? 1 : 0, transitionDelay: `${i * 150}ms` }}
+            >
+              <circle cx={cx} cy={cy} r={R} fill="none" stroke={`url(#${gid}-g)`} strokeWidth="7" strokeLinecap="round" strokeDasharray={`${seg - gap} ${circ}`} strokeDashoffset={-(i * seg)} transform={`rotate(-90 ${cx} ${cy})`} filter={`url(#${gid}-b)`} opacity="0.7" />
+              <circle cx={cx} cy={cy} r={R} fill="none" stroke={`url(#${gid}-g)`} strokeWidth="7" strokeLinecap="round" strokeDasharray={`${seg - gap} ${circ}`} strokeDashoffset={-(i * seg)} transform={`rotate(-90 ${cx} ${cy})`} />
+            </g>
+          ))}
+        {/* 徽章 */}
+        <polygon points={hex(46)} fill={`url(#${gid}-f)`} stroke={`url(#${gid}-g)`} strokeWidth="2" />
+        <polygon points={hex(39)} fill="none" stroke="#22d3ee" strokeWidth="0.6" opacity="0.5" />
+        {cefr && (
+          <text x={cx} y={cy - 17} textAnchor="middle" fontSize="10" fontWeight="bold" fill={cefrColor(cefr)} letterSpacing="2.5">
+            {cefr}
+          </text>
+        )}
+        <text x={cx} y={cy + 14} textAnchor="middle" fontSize="34" fontWeight="800" fill="#fff" letterSpacing="-1">
+          {scoreNow}
+        </text>
+        <text x={cx} y={cy + 29} textAnchor="middle" fontSize="9" fontFamily="ui-monospace, monospace" className="fill-gray-500">
+          / {scoreMax ?? '—'}
+        </text>
+        <text x={cx} y={cy + R + 16} textAnchor="middle" fontSize="8.5" letterSpacing="1.5" className="fill-gray-500">
+          DUOLINGO SCORE{band && scoreEta ? ` · ${band.done}/${band.total} TO ${scoreEta.target}` : ''}
+        </text>
+      </svg>
+      <div className="text-[11px] text-gray-500">
+        {scoreEta ? (
+          <>
+            next <span className="font-mono text-violet-300">{scoreEta.target}</span>
+            {` · ${scoreEta.remaining} unit${scoreEta.remaining > 1 ? 's' : ''} · ≈ ${scoreEta.dateLabel}`}
+          </>
+        ) : (
+          scoreTimeline.length > 0 && `reached ${fmtDate(scoreTimeline[scoreTimeline.length - 1].since)}`
         )}
       </div>
-      <div className="mt-2 text-[10px] text-gray-500">
-        {scoreEta
-          ? `next ${scoreEta.target} · ${scoreEta.remaining} units · ~${scoreEta.pace.toFixed(1)}/day`
-          : lastStep
-            ? `${lastStep.approx ? 'first seen' : 'reached'} ${fmtDate(lastStep.since)}`
-            : ''}
+    </div>
+  )
+}
+
+/** CEFR journey:五段等宽半圆弧,每段亮起的比例 = 该段单元完成度(Intro 全亮、A1 亮 37%、其余暗),
+ *  亮起末端带光晕脉冲;中心写当前段、完成度、剩余单元与 ETA。只讲课程进度,不放分数 */
+function CefrArc() {
+  const on = useMounted(200)
+  const gid = useId()
+  if (levels.length === 0) return null
+  const W = 420
+  const H = 235
+  const cx = 210
+  const cy = 200
+  const R = 160
+  const w = 22
+  const n = levels.length
+  const GAP = 0.035
+  const span = (Math.PI - GAP * (n - 1)) / n
+  const pt = (a: number, r: number) => [cx + r * Math.cos(a), cy + r * Math.sin(a)] as const
+  const arc = (a: number, b: number) => {
+    const [x1, y1] = pt(a, R)
+    const [x2, y2] = pt(b, R)
+    return `M ${x1} ${y1} A ${R} ${R} 0 0 1 ${x2} ${y2}`
+  }
+  const totalUnits = levels.reduce((s, l) => s + l.total, 0)
+  const doneUnits = levels.reduce((s, l) => s + l.done, 0)
+  const coursePct = totalUnits > 0 ? Math.round((doneUnits / totalUnits) * 100) : 0
+  const cur = levelNow
+  const curPct = cur && cur.total > 0 ? Math.round((cur.done / cur.total) * 100) : 0
+  const eta = cur ? sectionEta(cur) : null
+  let tip: readonly [number, number] | null = null
+  let tipColor = '#22d3ee'
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full max-w-[420px] overflow-visible" role="img" aria-label="CEFR journey">
+        <defs>
+          <filter id={`${gid}-g`} x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="3" />
+          </filter>
+        </defs>
+        {levels.map((l, i) => {
+          const a0 = Math.PI + i * (span + GAP)
+          const a1 = a0 + span
+          const pct = l.total > 0 ? l.done / l.total : 0
+          const color = cefrColor(l.cefr)
+          const isCur = pct > 0 && pct < 1
+          if (isCur) {
+            tip = pt(a0 + span * pct, R)
+            tipColor = color
+          }
+          const mid = (a0 + a1) / 2
+          const edge = i === 0 ? 'end' : i === n - 1 ? 'start' : 'middle'
+          const [lx, ly] = pt(mid, edge === 'middle' ? R + 24 : R + 18)
+          const [ux, uy] = pt(mid, R - w / 2 - 12)
+          return (
+            <g key={l.cefr}>
+              <path d={arc(a0, a1)} fill="none" stroke={color} strokeWidth={w} opacity="0.16" />
+              {pct > 0 && (
+                <path
+                  d={arc(a0, a0 + span * pct)}
+                  fill="none"
+                  stroke={color}
+                  strokeWidth={w}
+                  className="transition-opacity duration-700 motion-reduce:transition-none"
+                  style={{ opacity: on ? (pct === 1 ? 0.75 : 1) : 0, transitionDelay: `${i * 120}ms` }}
+                />
+              )}
+              <text x={lx} y={ly + 4} textAnchor={edge} fontSize="12" fontWeight="bold" letterSpacing="0.5" fill={pct > 0 ? color : '#6b7280'}>
+                {l.cefr}
+              </text>
+              <text x={ux} y={uy + 4} textAnchor="middle" fontSize="9" fontFamily="ui-monospace, monospace" className={pct > 0 ? 'fill-gray-400' : 'fill-gray-600'}>
+                {pct === 1 ? 'done' : `${l.done}/${l.total}`}
+              </text>
+            </g>
+          )
+        })}
+        {tip && (
+          <g className="transition-opacity duration-700 motion-reduce:transition-none" style={{ opacity: on ? 1 : 0, transitionDelay: '500ms' }}>
+            <circle cx={tip[0]} cy={tip[1]} r="9" fill={tipColor} opacity="0.5" filter={`url(#${gid}-g)`} />
+            <circle
+              cx={tip[0]}
+              cy={tip[1]}
+              r="6"
+              fill={tipColor}
+              className="animate-ping motion-reduce:animate-none"
+              style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
+            />
+            <circle cx={tip[0]} cy={tip[1]} r="4.5" fill="#fff" />
+          </g>
+        )}
+        {cur && (
+          <>
+            <text x={cx} y={cy - 58} textAnchor="middle" fontSize="44" fontWeight="800" letterSpacing="-1" fill={cefrColor(cur.cefr)}>
+              {cur.cefr}
+            </text>
+            <text x={cx} y={cy - 36} textAnchor="middle" fontSize="12" fontFamily="ui-monospace, monospace" className="fill-gray-400">
+              {cur.done} / {cur.total} units · {curPct}%
+            </text>
+            <text x={cx} y={cy - 18} textAnchor="middle" fontSize="9" letterSpacing="2" className="fill-gray-500">
+              CURRENT LEVEL
+            </text>
+            <text x={cx} y={cy - 2} textAnchor="middle" fontSize="10" className="fill-gray-400">
+              {cur.total - cur.done} units to go{eta ? ` · ETA ${eta}` : ''}
+            </text>
+          </>
+        )}
+      </svg>
+      <div className="flex flex-wrap justify-center gap-x-5 gap-y-1 text-xs text-gray-400">
+        <span>
+          Course <b className="font-semibold text-gray-200">{doneUnits} / {totalUnits}</b> units · {coursePct}%
+        </span>
+        <span>
+          {levels
+            .filter((l) => l.done > 0)
+            .map((l, i) => (
+              <span key={l.cefr}>
+                {i > 0 && ' · '}
+                {l.cefr}{' '}
+                <b className="font-semibold text-gray-200">{l.done >= l.total ? 'done' : `${l.done}/${l.total}`}</b>
+              </span>
+            ))}
+        </span>
       </div>
     </div>
   )
@@ -596,11 +925,6 @@ export default function English() {
     )
   }
 
-  const secs = cefrSections()
-  const totalUnits = secs.reduce((s, x) => s + x.total, 0)
-  const doneUnits = secs.reduce((s, x) => s + x.done, 0)
-  const coursePct = totalUnits > 0 ? Math.round((doneUnits / totalUnits) * 100) : 0
-
   return (
     <div className="space-y-8">
       <div>
@@ -610,17 +934,17 @@ export default function English() {
         </SectionSubtitle>
       </div>
 
-      {/* Hero:今日数据 + 多邻国分数 + 课程进度环 */}
-      <Card className="flex flex-col items-center gap-8 p-6 sm:flex-row sm:justify-around">
+      {/* Hero 三栏:今日数据 · 当前段分数走势 · 段位徽章(手机端竖排) */}
+      <Card className="grid items-center gap-5 p-6 sm:grid-cols-[12rem_minmax(0,1fr)_11.5rem]">
         <div className="text-center sm:text-left">
           <div className="font-mono text-xs text-gray-500">TODAY · {todayIso}</div>
-          <div className="mt-2 flex items-baseline gap-2">
+          <div className="mt-2 flex items-baseline justify-center gap-2 sm:justify-start">
             <span className="text-5xl font-bold heading-gradient">{streakN}</span>
             <span className="text-sm text-gray-400">day streak 🔥</span>
           </div>
           {todayDetail ? (
             todayDetail.lessons > 0 ? (
-              <div className="mt-3 flex gap-5 text-sm">
+              <div className="mt-3 flex justify-center gap-4 text-sm whitespace-nowrap sm:justify-start">
                 <span>
                   <span className="font-bold text-cyan-300">{todayDetail.xp}</span>
                   <span className="ml-1 text-gray-500">XP</span>
@@ -648,23 +972,15 @@ export default function English() {
             <p className="mt-3 text-sm text-gray-500">No lessons yet today 🦉</p>
           )}
         </div>
-        <ScoreBlock />
-        {scoreNow != null && scoreMax ? (
-          <ProgressRing
-            pct={Math.round((scoreNow / scoreMax) * 100)}
-            label={`${Math.round((scoreNow / scoreMax) * 100)}%`}
-            sub={`score · ${scoreNow}/${scoreMax}`}
-          />
-        ) : totalUnits > 0 ? (
-          <ProgressRing pct={coursePct} label={`${coursePct}%`} sub={`course · ${doneUnits}/${totalUnits} units`} />
-        ) : null}
+        <ScoreBandChart />
+        <ScoreBadge />
       </Card>
 
-      {/* CEFR 地图:当前段即圆环 */}
-      {secs.length > 0 && (
+      {/* CEFR journey:五段完成度弧 */}
+      {levels.length > 0 && (
         <Card>
-          <h2 className="mb-4 text-sm font-medium text-gray-300">CEFR journey</h2>
-          <CefrMap />
+          <h2 className="mb-2 text-sm font-medium text-gray-300">CEFR journey</h2>
+          <CefrArc />
           <p className="mt-3 text-xs text-gray-500">
             Intro → A1 → A2 → B1 → B2. B2 is roughly comfortable working English.
           </p>
@@ -727,8 +1043,8 @@ export default function English() {
         Data source: Duolingo API (updated daily via GitHub Actions). Longest streak{' '}
         {current.longestStreak ?? latest.streak} · duration estimated from lesson timestamps. Score
         tracked since Aug 16 — earlier moves unrecorded, Aug 16–20 reconstructed from unit
-        progress. Score step dates come from lesson timestamps since Aug 29; ≈ marks earlier
-        steps dated by snapshot day 🦉
+        progress. Score step dates from lesson timestamps since Aug 29 and from snapshot times
+        before; ≈ is the estimate for the next score 🦉
       </p>
     </div>
   )

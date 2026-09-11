@@ -295,7 +295,9 @@ class ExtractScoreInfoTest(unittest.TestCase):
                 }
             ],
         }
-        self.assertEqual(fd.extract_score_info(cc)["nextAtUnit"], 30)
+        info = fd.extract_score_info(cc)
+        self.assertEqual(info["nextAtUnit"], 30)
+        self.assertEqual(info["bandStart"], 28)
 
     def test_last_unit_done_is_nth_unit_index(self):
         # 路径线性解锁:每段完成的就是前 N 个单元,取第 N 个的 unitIndex
@@ -344,6 +346,7 @@ class ExtractScoreInfoTest(unittest.TestCase):
         info = fd.extract_score_info(cc)
         self.assertEqual(info["reached"], 129)
         self.assertNotIn("nextAtUnit", info)
+        self.assertNotIn("bandStart", info)
 
 
 def _ts(month, day, hour, minute=0):
@@ -429,6 +432,34 @@ class ExtractUnitProgressTest(unittest.TestCase):
     def test_empty_inputs(self):
         self.assertEqual(fd.extract_unit_progress(None, None), ({}, {}))
         self.assertEqual(fd.extract_unit_progress({}, []), ({}, {}))
+
+
+class FetchCourseProgressTest(unittest.TestCase):
+    def test_sections_carry_units_and_score_range(self):
+        u = {
+            "currentCourse": {
+                "pathSectioned": [
+                    {"completedUnits": 2, "units": [
+                        {**_score_unit(0, [5]), "cefrLevel": "Intro"},
+                        {**_score_unit(1, [9, 9]), "cefrLevel": "Intro"},
+                    ]},
+                    {"completedUnits": 1, "units": [
+                        {**_score_unit(10, [10]), "cefrLevel": "A1"},
+                        {**_score_unit(11, [12]), "cefrLevel": "A1"},
+                    ]},
+                    {"completedUnits": 0, "units": []},  # 空段跳过
+                    {"completedUnits": 0, "units": [{"unitIndex": 99, "cefrLevel": "A2", "levels": []}]},
+                ]
+            }
+        }
+        self.assertEqual(
+            fd.fetch_course_progress(u),
+            [
+                {"cefr": "Intro", "unitsTotal": 2, "unitsCompleted": 2, "scoreMin": 5, "scoreMax": 9},
+                {"cefr": "A1", "unitsTotal": 2, "unitsCompleted": 1, "scoreMin": 10, "scoreMax": 12},
+                {"cefr": "A2", "unitsTotal": 1, "unitsCompleted": 0},  # 没有节点分数就不带区间
+            ],
+        )
 
 
 class NormalizeTokenTest(unittest.TestCase):
