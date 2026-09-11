@@ -41,6 +41,10 @@ interface HistoryData {
   }
   days: DayRow[]
   daily?: Record<string, DayDetail>
+  /** 完成单元 N 的日期(逐课时间戳反推,采集脚本只增不改) */
+  unitDone?: Record<string, string>
+  /** 到达 N 分的日期(同上)。days 行里的 score 只是采集时刻的瞬时值,时间线以这份为准 */
+  scoreReached?: Record<string, string>
 }
 
 const hist = history as HistoryData
@@ -105,21 +109,39 @@ const fmtDate = (d: string) =>
   new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 const dayDiff = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000)
 
-/** 分数时间线:每档到达日 + 进入该档用了几天;首档之前没数据,exact=false 表示天数只是下限 */
-const scoreTimeline = scoreSnaps.reduce<
-  { score: number; since: string; tookDays: number | null; exact: boolean }[]
->((acc, s) => {
-  const prev = acc[acc.length - 1]
-  if (prev && prev.score === s.score!.reached) return acc
-  acc.push({
-    score: s.score!.reached,
-    since: s.date,
-    tookDays: prev ? dayDiff(prev.since, s.date) : null,
-    // 上一档是"开记录时就已到达"的首档时,间隔天数不可知确切值
-    exact: acc.length >= 2,
-  })
+/** 各档首次出现在快照里的日期:采集时刻所在日,可能比真实到达晚一天(定时任务漂到凌晨才跑) */
+const scoreFirstSeen = scoreSnaps.reduce<Record<number, string>>((acc, s) => {
+  const v = s.score!.reached
+  if (acc[v] == null) acc[v] = s.date
   return acc
-}, [])
+}, {})
+const scoreReached = hist.scoreReached ?? {}
+
+/** 分数时间线:每档到达日 + 进入该档用了几天。
+ *  到达日优先取 scoreReached(逐课时间戳反推,精确到当天),没有的档退回快照首见日(approx)。
+ *  首档之前没数据,exact=false 表示天数只是下限 */
+const scoreTimeline = Array.from(
+  new Set([...Object.keys(scoreFirstSeen), ...Object.keys(scoreReached)].map(Number)),
+)
+  .filter((v) => scoreNow == null || v <= scoreNow)
+  .sort((a, b) => a - b)
+  .reduce<
+    { score: number; since: string; approx: boolean; tookDays: number | null; exact: boolean }[]
+  >((acc, v) => {
+    const precise = scoreReached[String(v)]
+    const since = precise ?? scoreFirstSeen[v]
+    if (!since) return acc
+    const prev = acc[acc.length - 1]
+    acc.push({
+      score: v,
+      since,
+      approx: !precise,
+      tookDays: prev ? dayDiff(prev.since, since) : null,
+      // 上一档是"开记录时就已到达"的首档时,间隔天数不可知确切值
+      exact: acc.length >= 2,
+    })
+    return acc
+  }, [])
 
 /** 下一分预估:剩余单元 ÷ 有记录以来的单元推进速度。数据不足/已满分时为 null,页面降级 */
 const scoreEta = (() => {
@@ -313,11 +335,12 @@ function ScoreBlock() {
           const current = i === scoreTimeline.length - 1
           const took =
             t.tookDays != null ? `${t.exact ? '' : '≥'}${t.tookDays}d` : 'tracking started'
+          const reached = t.approx ? `first seen ${t.since} (snapshot day)` : `reached ${t.since}`
           return (
             <div key={t.score} className="flex items-center gap-1">
               {i > 0 && <span className="text-[10px] text-gray-600">→</span>}
               <div
-                title={`${t.score} · reached ${t.since} · ${took}`}
+                title={`${t.score} · ${reached} · ${took}`}
                 className={`rounded-md border px-2 py-0.5 text-center ${
                   current
                     ? 'border-violet-400/60 bg-violet-400/10'
@@ -331,7 +354,10 @@ function ScoreBlock() {
                 >
                   {t.score}
                 </span>
-                <span className="ml-1 text-[9px] text-gray-500">{fmtDate(t.since)}</span>
+                <span className="ml-1 text-[9px] text-gray-500">
+                  {t.approx ? '≈' : ''}
+                  {fmtDate(t.since)}
+                </span>
               </div>
             </div>
           )
@@ -352,7 +378,7 @@ function ScoreBlock() {
         {scoreEta
           ? `next ${scoreEta.target} · ${scoreEta.remaining} units · ~${scoreEta.pace.toFixed(1)}/day`
           : lastStep
-            ? `reached ${fmtDate(lastStep.since)}`
+            ? `${lastStep.approx ? 'first seen' : 'reached'} ${fmtDate(lastStep.since)}`
             : ''}
       </div>
     </div>
@@ -701,7 +727,8 @@ export default function English() {
         Data source: Duolingo API (updated daily via GitHub Actions). Longest streak{' '}
         {current.longestStreak ?? latest.streak} · duration estimated from lesson timestamps. Score
         tracked since Aug 16 — earlier moves unrecorded, Aug 16–20 reconstructed from unit
-        progress 🦉
+        progress. Score step dates come from lesson timestamps since Aug 29; ≈ marks earlier
+        steps dated by snapshot day 🦉
       </p>
     </div>
   )

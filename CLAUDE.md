@@ -29,7 +29,7 @@ python3 scripts/fetch-duolingo.py   # 手动跑多邻国采集(见下)
 ### 数据流(三条独立管道)
 
 1. **构建时注入**:`prebuild` 跑 `npm run data` = `scripts/fetch-repos.ts`(拉仓库列表 → `src/data/repos.json`,gitignored,CI 用 `GITHUB_TOKEN`、本地匿名超限沿用旧文件)+ `scripts/gen-static.ts`(从 `content/posts` 生成 `public/rss.xml`/`sitemap.xml`/`robots.txt`,均 gitignored,域名取自 `site.config.ts`)。
-2. **每日定时采集**:`.github/workflows/duolingo.yml` 每天 2 次(北京 09:13 / 21:13;2026-08-21 从 4 次精简)跑 `scripts/fetch-duolingo.py` → 更新 `data/duolingo-history.json` → 自动 commit(同日重跑覆盖,每天只留一条快照,以 21:13 那次为当天收尾;傍晚后 xpGains 滞后的课由次日 09:13 回填)。token 走 Secret `DUOLINGO_JWT`,**绝不进代码**,且必须由 workflow fetch step 的 `env:` 映射注入脚本——**漏了这行 CI 会静默退化成无明细模式**(2026-08-17 发现从建仓起就漏着,日明细一直靠本地跑续命;脚本已在 CI 缺 token 时直接报红防复发)。两个坑:
+2. **每日定时采集**:`.github/workflows/duolingo.yml` 每天 2 次(cron 写的是北京 09:13 / 23:13,**GitHub 定时实测漂移 3~5 小时**,实跑约 12~14 点和次日凌晨 2~4 点;2026-08-21 从 4 次精简,2026-09-11 晚班从 21:13 改 23:13)跑 `scripts/fetch-duolingo.py` → 更新 `data/duolingo-history.json` → 自动 commit(同日重跑覆盖,每天只留一条快照;**快照行的"今天"在北京凌晨 5 点前算前一天**(`snapshot_day()`/`DAY_ROLLOVER_HOUR`),所以漂到凌晨的晚班正好是前一天的收尾——2026-09-11 前按自然日归,把 9/8 晚学出来的 17 分记成了 9/9;傍晚后 xpGains 滞后的课由次日早班回填)。token 走 Secret `DUOLINGO_JWT`,**绝不进代码**,且必须由 workflow fetch step 的 `env:` 映射注入脚本——**漏了这行 CI 会静默退化成无明细模式**(2026-08-17 发现从建仓起就漏着,日明细一直靠本地跑续命;脚本已在 CI 缺 token 时直接报红防复发)。两个坑:
    - **snapshot 的 commit 不会触发 `on: push`**(GITHUB_TOKEN 推送防循环规则),部署靠 `deploy.yml` 的 `workflow_run` 监听 snapshot workflow 完成来触发;
    - **xpGains 对当天数据有数小时滞后**,白天手动跑可能缺当天明细(daily 里没有当天 key 时页面整行不展示——不做 totalXp 差值兜底,差值窗口横跨前一晚会把昨晚 XP 算成今天的),以 21:13 定时跑 + 次日 09:13 回填为准。
 3. **博客内容**:`content/posts/*.mdx` 经 `import.meta.glob` eager 加载(`src/lib/posts.ts`)。**MDX 正文是 default export,不是命名 export**——这是曾导致文章页空白的坑。
@@ -37,12 +37,12 @@ python3 scripts/fetch-duolingo.py   # 手动跑多邻国采集(见下)
 ### 多邻国数据的关键设计
 
 - 双级数据源:公开接口(保底,无 token)+ JWT 明细(逐课 xpGains)。
-- **档案是对象结构**(2026-08-20 从 list 改造,公共字段提升到外层):`{meta(静态身份: username/streakStart/learningLanguage), current(当前状态: sections/sessionCount/longestStreak/scoreMax,接口残缺时沿用旧值), days(纯时间序列: date/totalXp/streak/score/apiCoverage,一天一行,同日重跑覆盖), daily(近窗口流水账: {date: {lessons,minutes,xp}})}`。旧 list 文件由 `migrate()` 自动升级。消费方:本仓库 English.tsx / Now.tsx,以及 maxhello/maxhello 的 badge(读 `days[-1]` 的 date/streak/totalXp,已做双格式兼容)。
+- **档案是对象结构**(2026-08-20 从 list 改造,公共字段提升到外层):`{meta(静态身份: username/streakStart/learningLanguage), current(当前状态: sections/sessionCount/longestStreak/scoreMax,接口残缺时沿用旧值), days(纯时间序列: date/totalXp/streak/score/apiCoverage,一天一行,同日重跑覆盖), daily(近窗口流水账: {date: {lessons,minutes,xp}}), unitDone({unitIndex: 完成日}), scoreReached({分数: 到达日})}`。**unitDone/scoreReached 由逐课时间戳反推**(`extract_unit_progress()`:分数只在单元切换时跳变,完成时刻夹在本单元末课与下一单元首课之间;xpGains 每课带 `skillId` 对应单元,unit 130 起一个 skillId 跨多单元的不用),与采集时刻无关,**只增不改**(首次算出时窗口最全)。旧 list 文件由 `migrate()` 自动升级。消费方:本仓库 English.tsx / Now.tsx,以及 maxhello/maxhello 的 badge(读 `days[-1]` 的 date/streak/totalXp,已做双格式兼容)。
 - **`xpGains` 是滚动窗口(约 15 天,按时间戳不按天)**:脚本必须把新拉到的天与档案 `daily` **合并**,同日冲突**保留 lessons 更多的一份**——窗口最老的那天重拉时只剩"边界时刻之后"的课,直接新覆盖旧会把完整日写成残缺日(2026-08-20 实锤:上午重跑把 8/5 从 18 课覆盖成 9 课)。此逻辑在 `fetch-duolingo.py` 的 `merge_history()`(有单测锁行为:`scripts/test_fetch_duolingo.py`)。
 - **归日时区固定 `Asia/Shanghai`**(`TZ` 常量 + `day_key()`),不随运行环境变——本地(UTC+8)和 CI(UTC)结果必须一致。
-- **防膨胀**:`daily` 全量住顶层(近 15 天窗口,滑出的天靠合并保留);`current` 状态字段只有一份。文件一年 ~85KB 且全部进前端 bundle,别往 days 行塞每天不变的字段。
+- **防膨胀**:`daily` 全量住顶层(近 15 天窗口,滑出的天靠合并保留);`current` 状态字段只有一份;`unitDone` 每完成一个单元加一行,量级可忽略。文件一年 ~85KB 且全部进前端 bundle,别往 days 行塞每天不变的字段。
 - **JWT 设置了但拉取失败(如过期)直接 `exit 1`**,让 workflow 变红,绝不静默提交没有明细的快照。
-- **多邻国分数**:days 行的 `score` = `{reached, lastUnitDone, nextAtUnit}`,reached 来自 `currentCourse.scoreMetadata.reachedScore`(10~160,CEFR 对齐,接口原值),`lastUnitDone`/`nextAtUnit` 从 pathSectioned 算(最后完成单元、下一分单元带末单元),页面用它们做分数时间线和"下一分预估";满分在 `current.scoreMax`。分数是快变量,当天缺就缺,页面用最近一份兜底;2026-08-16~08-20 历史分数按单元进度回填(页面页脚注明)。
+- **多邻国分数**:days 行的 `score` = `{reached, lastUnitDone, nextAtUnit}`,reached 来自 `currentCourse.scoreMetadata.reachedScore`(10~160,CEFR 对齐,接口原值),`lastUnitDone`/`nextAtUnit` 从 pathSectioned 算;满分在 `current.scoreMax`。**单元节点的 `levelScoreInfo.reachedScore` = 学这个单元时持有的分数**(单元内一致,A1 段每 3 个单元一档),所以 `nextAtUnit` = 当前分数带的**末单元**(做完它就涨分)——2026-09-11 前错取成下一分带的末单元,预估多出一整个带,历史 26 行已按实时课程结构回填。页面分数时间线的到达日**以 `scoreReached` 为准**,没有的档退回快照首见日并标 ≈(页脚注明);"下一分预估"用最新行的 lastUnitDone/nextAtUnit。分数是快变量,当天缺就缺,页面用最近一份兜底;2026-08-16~08-20 历史分数按单元进度回填(页面页脚注明)。
 - 本地跑脚本需 `DUOLINGO_INSECURE=1`(python.org 安装缺 CA)+ `DUOLINGO_JWT` 环境变量;CI 不需要 INSECURE。
 
 ### 配置集中
@@ -61,5 +61,5 @@ python3 scripts/fetch-duolingo.py   # 手动跑多邻国采集(见下)
 
 - **站点内容必须真实**:不编造文章/经历/数据。加占位内容前先问用户。
 - **与用户工作相关的内容(如 TAPD)绝不访问、绝不上站**。
-- git 身份:仓库级配置为 noreply 邮箱(`10436648+maxhello@users.noreply.github.com`),**不要改全局 git 配置**。
+- git 身份:`~/code/github/` 下所有仓库通过 `~/.gitconfig` 的 `includeIf "gitdir:~/code/github/"` 引用 `~/.gitconfig-github`,自动使用 `Max Zhang <10436648+maxhello@users.noreply.github.com>`(2026-09-11 配置,替代原先的仓库级设置);全局默认身份是工作邮箱,**不要改全局默认 `user.*`**,也不要在本仓库再加仓库级 user 配置。提交前若发现作者不是 noreply 邮箱,先检查 includeIf 是否失效,不要直接改配置。推送走 SSH,账号由 SSH 密钥决定(当前为 maxhello)。
 - commit message 不加 `Co-Authored-By: Claude` 行(用户明确要求)。

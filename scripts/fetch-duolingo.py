@@ -7,9 +7,10 @@
   2. 带 JWT(环境变量 DUOLINGO_JWT,存于 GitHub Secrets):
      逐课 xpGains 记录 → 按天聚合出每日课程数与学习时长(分钟)
 
-一天一条,同日重跑覆盖。时长口径:相邻课程间隔<15分钟累加,末课+5分钟。
+一天一条,同日重跑覆盖;快照行的"今天"在北京凌晨 5 点前算前一天(CI 定时漂移到凌晨时仍归前一晚)。
 归日统一按北京时间(Asia/Shanghai),与多邻国 streak 口径一致,本地跑和 CI(UTC)结果相同。
-全量 daily 只保留在最新快照,旧快照剥掉 daily,防止文件随天数平方膨胀。
+逐课记录还用来反推"哪天完成哪个单元 / 哪天到哪一分"(unitDone / scoreReached),
+这两份日期由学习行为决定、与采集时刻无关,页面的分数时间线以它为准。
 
 用法: python3 scripts/fetch-duolingo.py
 CI:  GitHub Actions 每日定时跑,自动 commit 数据文件。
@@ -35,6 +36,10 @@ UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
 GAP_MAX = 15 * 60  # 相邻课程间隔超过 15 分钟不算同次学习
 LAST_LESSON_MIN = 5  # 每天最后一节课的估算时长
 TZ = ZoneInfo("Asia/Shanghai")  # 归日时区固定为北京时间,不随运行环境(本地/CI)漂移
+# 快照行的"学习日"切换点:凌晨 5 点前跑的采集归前一天。
+# GitHub 定时任务实测漂移 3~5 小时,"21:13 收尾"实际常在次日 0~2 点跑,
+# 按自然日归会把前一晚学出来的进度记成次日(2026-09-11 排查 16→17 分升档日晚记一天时发现)
+DAY_ROLLOVER_HOUR = 5
 
 
 def ssl_ctx():
@@ -83,8 +88,10 @@ def extract_score_info(current_course):
     - reached:当前分数(scoreMetadata.reachedScore,接口原值,无计算)
     - lastUnitDone:最后已完成单元的全局 unitIndex。路径线性解锁,
       每段完成的必是前 N 个单元,取第 N 个的 unitIndex
-    - nextAtUnit:"完成后到达下一分"的最末单元(全局 unitIndex)。
-      节点级 levelScoreInfo.reachedScore = 完成该节点后到达的分数,
+    - nextAtUnit:"完成它就到下一分"的单元(全局 unitIndex)。
+      节点级 levelScoreInfo.reachedScore = 学这个单元时持有的分数,一个单元内所有节点相同,
+      分数只在单元切换时跳变——所以要取当前分数带的最后一个单元,
+      不是下一分带的最后一个(2026-09-11 前取错成后者,预估整体多出一整个带)。
       页面结合推进速度算"还差几个单元、大概哪天到下一分"
     接口偶发缺这些字段时返回空 dict:当天行没 score 键,页面用最近一份兜底。
     分数是快变量,刻意不沿用旧值,宁可缺一天也不留过期值。
@@ -97,19 +104,82 @@ def extract_score_info(current_course):
     info = {"reached": score}
     if meta.get("pathEndingScore"):
         info["max"] = meta["pathEndingScore"]
-    target = score + 1
     for sec in cc.get("pathSectioned") or []:
         units = sec.get("units") or []
         n = min(sec.get("completedUnits") or 0, len(units))
         if n > 0 and units[n - 1].get("unitIndex") is not None:
             info["lastUnitDone"] = max(info.get("lastUnitDone", 0), units[n - 1]["unitIndex"])
+        if info.get("max") is not None and score >= info["max"]:
+            continue  # 已满分:再没有"做完就涨分"的单元
         for unit in units:
-            for lv in unit.get("levels") or []:
-                if ((lv.get("levelScoreInfo") or {}).get("reachedScore")) == target:
-                    idx = unit.get("unitIndex")
-                    if idx is not None:
-                        info["nextAtUnit"] = max(info.get("nextAtUnit", 0), idx)
+            idx = unit.get("unitIndex")
+            if idx is not None and unit_score(unit) == score:
+                info["nextAtUnit"] = max(info.get("nextAtUnit", 0), idx)
     return info
+
+
+def unit_score(unit):
+    """学这个单元时持有的分数(节点 levelScoreInfo.reachedScore,单元内一致,取最小值防脏数据)。"""
+    scores = [
+        (lv.get("levelScoreInfo") or {}).get("reachedScore") for lv in unit.get("levels") or []
+    ]
+    scores = [x for x in scores if x is not None]
+    return min(scores) if scores else None
+
+
+def extract_unit_progress(current_course, gains):
+    """从逐课记录反推"哪天完成了哪个单元 / 哪天到了哪一分",与采集时刻无关。
+
+    分数只在单元切换时跳变:完成 unit N 的那一刻,分数变成 unit N+1 的 unit_score。
+    单元完成时刻夹在"本单元最后一节课"和"下一单元第一节课"之间(中间是单元复习/故事等
+    不带 skillId 的节点),取这个区间里最后一次得分记录的时间归日。
+    xpGains 只有约 15 天窗口:本单元最后一课已滑出窗口的不算(区间下界不可知,不能拿
+    窗口里随便一次练习冒充完成时刻),靠每次采集合并积累,已有的不覆盖。
+
+    返回 (unitDone, scoreReached),键都是字符串(与 JSON 读回来的形态一致,便于合并):
+      unitDone     {"30": "2026-09-08"}   完成单元 30 的日期
+      scoreReached {"17": "2026-09-08"}   到达 17 分的日期
+    """
+    cc = current_course or {}
+    skill_units = {}
+    scores = {}
+    for sec in cc.get("pathSectioned") or []:
+        for unit in sec.get("units") or []:
+            idx = unit.get("unitIndex")
+            if idx is None:
+                continue
+            sc = unit_score(unit)
+            if sc is not None:
+                scores[idx] = sc
+            for lv in unit.get("levels") or []:
+                sid = (lv.get("pathLevelMetadata") or {}).get("skillId")
+                if sid:
+                    skill_units.setdefault(sid, set()).add(idx)
+    # 后段课程一个 skillId 横跨多个单元(实测从 unit 130 起),对不上具体单元的不用
+    skill_unit = {sid: next(iter(us)) for sid, us in skill_units.items() if len(us) == 1}
+
+    times = sorted(g["time"] for g in gains or [] if g.get("time") is not None)
+    first = {}
+    last = {}
+    for g in sorted(gains or [], key=lambda g: g.get("time") or 0):
+        idx = skill_unit.get(g.get("skillId"))
+        if idx is None or g.get("time") is None:
+            continue
+        first.setdefault(idx, g["time"])
+        last[idx] = g["time"]
+
+    unit_done = {}
+    score_reached = {}
+    for idx in sorted(first):
+        prev = idx - 1
+        if prev not in last or last[prev] >= first[idx]:
+            continue
+        between = [t for t in times if last[prev] <= t < first[idx]]
+        done_day = day_key(between[-1])
+        unit_done[str(prev)] = done_day
+        if prev in scores and idx in scores and scores[idx] > scores[prev]:
+            score_reached[str(scores[idx])] = done_day
+    return unit_done, score_reached
 
 
 def fetch_public():
@@ -125,6 +195,14 @@ def fetch_public():
         "streakStart": (u.get("streakData") or {}).get("currentStreak", {}).get("startDate"),
         "learningLanguage": u.get("learningLanguage"),
     }
+
+
+def snapshot_day(now: datetime) -> str:
+    """快照行的日期键:凌晨 DAY_ROLLOVER_HOUR 点前算前一天(见常量注释)。"""
+    now = now.astimezone(TZ)
+    if now.hour < DAY_ROLLOVER_HOUR:
+        now -= timedelta(days=1)
+    return now.date().isoformat()
 
 
 def day_key(ts: int) -> str:
@@ -163,11 +241,14 @@ def fetch_daily_detail(token):
             "minutes": round(secs / 60),
             "xp": sum(g["xp"] for g in gains),
         }
+    unit_done, score_reached = extract_unit_progress(u.get("currentCourse"), u.get("xpGains"))
     extra = {
         "sections": fetch_course_progress(u),
         "longestStreak": u.get("longestStreak"),
         "sessionCount": u.get("sessionCount"),
         "score": extract_score_info(u.get("currentCourse")),
+        "unitDone": unit_done,
+        "scoreReached": score_reached,
     }
     return detail, extra
 
@@ -178,6 +259,8 @@ def fetch_daily_detail(token):
 #     "current": {"longestStreak", "sessionCount", "sections", "scoreMax"},  # 当前状态,页面只读这份
 #     "days":    [{"date", "totalXp", "streak", "score?", "apiCoverage?"}],  # 纯时间序列,一天一行
 #     "daily":   {"YYYY-MM-DD": {"lessons", "minutes", "xp"}}               # 近窗口流水账(~15 天)
+#     "unitDone":     {"30": "2026-09-08"},   # 完成单元 N 的日期(逐课时间戳反推,只增不改)
+#     "scoreReached": {"17": "2026-09-08"},   # 到达 N 分的日期(同上;days 行的 score 只是采集时刻的瞬时值)
 #   }
 
 META_KEYS = ("username", "streakStart", "learningLanguage")
@@ -224,7 +307,8 @@ def migrate(data):
 def merge_history(data: dict, payload: dict) -> dict:
     """把当天采集(payload)并进档案对象,返回新档案。
 
-    payload = {"meta": {...}, "current": {...}, "day": {...}, "daily": {...}}
+    payload = {"meta": {...}, "current": {...}, "day": {...}, "daily": {...},
+               "unitDone": {...}, "scoreReached": {...}}
 
     规则:
       - meta 每次整体刷新(公开接口给的就是最新身份信息)
@@ -234,6 +318,7 @@ def merge_history(data: dict, payload: dict) -> dict:
         (xpGains 窗口按时间戳滚动,最老的那天重拉时只剩"边界时刻之后"的课,
         直接新覆盖旧会把完整日写成残缺日——2026-08-20 实锤:
         上午本地重跑把 8/5 从 18 课覆盖成 9 课)
+      - unitDone / scoreReached 只增不改:首次算出时窗口最全,后来窗口滑动只会更残缺
     """
     data = migrate(data)
     if payload.get("meta"):
@@ -256,6 +341,12 @@ def merge_history(data: dict, payload: dict) -> dict:
         if not old or v.get("lessons", 0) >= old.get("lessons", 0):
             merged[d] = v
     data["daily"] = dict(sorted(merged.items()))
+    for key in ("unitDone", "scoreReached"):
+        found = dict(data.get(key) or {})
+        for k, v in (payload.get(key) or {}).items():
+            found.setdefault(str(k), v)
+        if found:
+            data[key] = dict(sorted(found.items(), key=lambda kv: int(kv[0])))
     return data
 
 
@@ -268,7 +359,8 @@ def normalize_token(raw: str) -> str:
 
 
 def main():
-    today = datetime.now(TZ).date().isoformat()
+    now = datetime.now(TZ)
+    today = snapshot_day(now)
     pub = fetch_public()
     day = {"date": today, "totalXp": pub["totalXp"], "streak": pub["streak"]}
     payload = {
@@ -309,6 +401,11 @@ def main():
             "sections": extra.get("sections"),
             "scoreMax": score.get("max"),
         }
+        payload["unitDone"] = extra.get("unitDone") or {}
+        payload["scoreReached"] = extra.get("scoreReached") or {}
+        if payload["scoreReached"]:
+            steps = ", ".join(f"{k}@{v}" for k, v in sorted(payload["scoreReached"].items()))
+            print(f"score steps in window: {steps}")
         days = sorted(detail)
         if days:
             # 覆盖范围写进日志:接口窗口滞后时一眼可见(2026-08-16/17 断档排查了半天才发现是这)
@@ -316,7 +413,7 @@ def main():
             for d in days[-3:]:
                 v = detail[d]
                 print(f"  {d}: {v['xp']}xp {v['lessons']} lessons ~{v['minutes']}min")
-            yesterday = (datetime.now(TZ) - timedelta(days=1)).date().isoformat()
+            yesterday = (datetime.fromisoformat(today) - timedelta(days=1)).date().isoformat()
             if days[-1] < yesterday:
                 print(
                     f"warning: xpGains only covers up to {days[-1]}; "
