@@ -50,6 +50,14 @@ interface HistoryData {
   unitDone?: Record<string, string>
   /** 到达 N 分的日期(同上)。days 行里的 score 只是采集时刻的瞬时值,时间线以这份为准 */
   scoreReached?: Record<string, string>
+  /** 手工补充(脚本不写不改):接口没有的历史事实,来自本人回忆,来源写在 note 里 */
+  manual?: {
+    note?: string
+    /** 进入某 CEFR 段的日期(定级测试直接落在段内时,scoreReached 里没有段起始分) */
+    levelEntered?: Record<string, string>
+    /** 由定级测试直接标完成、未实际学习的段 */
+    placedLevels?: string[]
+  }
 }
 
 const hist = history as HistoryData
@@ -228,10 +236,11 @@ const levelNow =
   null
 const levelNext = levelNow ? (levels[levels.indexOf(levelNow) + 1] ?? null) : null
 
-/** 进入当前段的日期:段起始分的到达日(A2 起精确);早于建档的段退回最早落在段内的快照日(approx,文案带 +) */
+/** 进入当前段的日期:段起始分的到达日(A2 起精确)→ 手工记录的进段日(定级直接落在段内,如 A1 自 07-27)
+ *  → 都没有则退回最早落在段内的快照日(approx,文案带 +) */
 const levelSince = (() => {
   if (!levelNow || levelNow.scoreMin == null || levelNow.scoreMax == null) return null
-  const exact = scoreReached[String(levelNow.scoreMin)]
+  const exact = scoreReached[String(levelNow.scoreMin)] ?? hist.manual?.levelEntered?.[levelNow.cefr]
   if (exact) return { date: exact, approx: false }
   const row = scoreSnaps.find(
     (s) => s.score!.reached >= levelNow.scoreMin! && s.score!.reached <= levelNow.scoreMax!,
@@ -632,6 +641,7 @@ function CefrArc() {
           const a1 = a0 + span
           const pct = l.total > 0 ? l.done / l.total : 0
           const color = cefrColor(l.cefr)
+          const placed = hist.manual?.placedLevels?.includes(l.cefr) ?? false
           const isCur = pct > 0 && pct < 1
           if (isCur) {
             tip = pt(a0 + span * pct, R)
@@ -658,7 +668,7 @@ function CefrArc() {
                 {l.cefr}
               </text>
               <text x={ux} y={uy + 4} textAnchor="middle" fontSize="9" fontFamily="ui-monospace, monospace" className={pct > 0 ? 'fill-gray-400' : 'fill-gray-600'}>
-                {pct === 1 ? 'done' : `${l.done}/${l.total}`}
+                {pct === 1 ? (placed ? 'placed' : 'done') : `${l.done}/${l.total}`}
               </text>
             </g>
           )
@@ -705,7 +715,13 @@ function CefrArc() {
               <span key={l.cefr}>
                 {i > 0 && ' · '}
                 {l.cefr}{' '}
-                <b className="font-semibold text-gray-200">{l.done >= l.total ? 'done' : `${l.done}/${l.total}`}</b>
+                <b className="font-semibold text-gray-200">
+                  {l.done >= l.total
+                    ? hist.manual?.placedLevels?.includes(l.cefr)
+                      ? 'placed'
+                      : 'done'
+                    : `${l.done}/${l.total}`}
+                </b>
               </span>
             ))}
         </span>
@@ -820,7 +836,7 @@ function DailyChart() {
                   {hoverD.xp} XP
                 </text>
                 <text x={bx + 10} y={52} fontSize="10" fill="#a78bfa">
-                  ~{hoverD.minutes}m · {hoverD.lessons}课
+                  {hoverD.minutes}m · {hoverD.lessons}课
                 </text>
               </g>
             )
@@ -899,7 +915,7 @@ function ActivityWall() {
               return (
                 <div
                   key={d.date}
-                  title={`${d.date}: ${d.xp} XP, ~${d.minutes} min`}
+                  title={`${d.date}: ${d.xp} XP, ${d.minutes} min`}
                   className={`size-3.5 rounded-sm transition-transform hover:scale-150 ${lvl} ${
                     d.date === todayIso ? 'animate-pulse ring-1 ring-cyan-300' : ''
                   }`}
@@ -950,7 +966,7 @@ export default function English() {
                   <span className="ml-1 text-gray-500">XP</span>
                 </span>
                 <span>
-                  <span className="font-bold text-violet-300">~{todayDetail.minutes}</span>
+                  <span className="font-bold text-violet-300">{todayDetail.minutes}</span>
                   <span className="ml-1 text-gray-500">min</span>
                 </span>
                 <span>
@@ -995,7 +1011,7 @@ export default function English() {
           label="time tracked"
         />
         <Stat value={`${weekMinutes} min`} label={`last 7 days (${weekXp} XP)`} />
-        <Stat value={`~${avgMinutes} min`} label="avg / active day" />
+        <Stat value={`${avgMinutes} min`} label="avg / active day" />
         <Stat value={String(current.sessionCount ?? '—')} label="lifetime lessons" />
         <Stat
           value={bestDay ? `${bestDay.xp}` : '—'}
@@ -1041,10 +1057,11 @@ export default function English() {
 
       <p className="text-sm text-gray-500">
         Data source: Duolingo API (updated daily via GitHub Actions). Longest streak{' '}
-        {current.longestStreak ?? latest.streak} · duration estimated from lesson timestamps. Score
+        {current.longestStreak ?? latest.streak} · study time as recorded by Duolingo. Score
         tracked since Aug 16 — earlier moves unrecorded, Aug 16–20 reconstructed from unit
         progress. Score step dates from lesson timestamps since Aug 29 and from snapshot times
-        before; ≈ is the estimate for the next score 🦉
+        before. Started Jul 27 via placement test (Intro skipped, score placed in A1); ≈ is the
+        estimate for the next score 🦉
       </p>
     </div>
   )

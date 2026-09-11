@@ -5,12 +5,13 @@
 两级数据源:
   1. 公开接口(无登录):streak / 总XP / 课程 —— 永远可用,保底
   2. 带 JWT(环境变量 DUOLINGO_JWT,存于 GitHub Secrets):
-     逐课 xpGains 记录 → 按天聚合出每日课程数与学习时长(分钟)
+     - xp_summaries 接口:按天给 XP / 课数(numSessions)/ 真实学习秒数(totalSessionTime),
+       可回溯到开课第一天,是每日明细(daily)的正式来源(2026-09-11 起;之前用 xpGains 时间戳估时长)
+     - 逐课 xpGains 记录(约 15 天滚动窗口):只用来反推"哪天完成哪个单元 / 哪天到哪一分"
+       (unitDone / scoreReached),这两份日期由学习行为决定、与采集时刻无关
 
 一天一条,同日重跑覆盖;快照行的"今天"在北京凌晨 5 点前算前一天(CI 定时漂移到凌晨时仍归前一晚)。
 归日统一按北京时间(Asia/Shanghai),与多邻国 streak 口径一致,本地跑和 CI(UTC)结果相同。
-逐课记录还用来反推"哪天完成哪个单元 / 哪天到哪一分"(unitDone / scoreReached),
-这两份日期由学习行为决定、与采集时刻无关,页面的分数时间线以它为准。
 
 用法: python3 scripts/fetch-duolingo.py
 CI:  GitHub Actions 每日定时跑,自动 commit 数据文件。
@@ -21,7 +22,6 @@ import ssl
 import sys
 import time
 import urllib.request
-from collections import defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -30,11 +30,11 @@ USERNAME = "Hello.Max"  # 2026-08 改名,原 Max__Zhang;USER_ID 不随改名变,
 USER_ID = "316697694210185"  # 登录接口按 id 查询,公开接口按 username
 PUBLIC_API = f"https://www.duolingo.com/2017-06-30/users?username={USERNAME}"
 AUTH_API = f"https://www.duolingo.com/2017-06-30/users/{USER_ID}"
+SUMMARY_API = f"https://www.duolingo.com/2017-06-30/users/{USER_ID}/xp_summaries"
+SUMMARY_DAYS = 45  # 每次回看多少天的 xp_summaries(合并只增不减,窗口只需覆盖可能被回填的近期)
 OUT = Path(__file__).resolve().parent.parent / "data" / "duolingo-history.json"
 
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
-GAP_MAX = 15 * 60  # 相邻课程间隔超过 15 分钟不算同次学习
-LAST_LESSON_MIN = 5  # 每天最后一节课的估算时长
 TZ = ZoneInfo("Asia/Shanghai")  # 归日时区固定为北京时间,不随运行环境(本地/CI)漂移
 # 快照行的"学习日"切换点:凌晨 5 点前跑的采集归前一天。
 # GitHub 定时任务实测漂移 3~5 小时,"21:13 收尾"实际常在次日 0~2 点跑,
@@ -222,8 +222,47 @@ def day_key(ts: int) -> str:
     return datetime.fromtimestamp(ts, TZ).strftime("%Y-%m-%d")
 
 
+def summaries_to_daily(summaries):
+    """xp_summaries 条目 → {date: {lessons, minutes, xp}}。
+
+    lessons = numSessions(实测与 xpGains 逐课计数完全一致),minutes = totalSessionTime/60 四舍五入
+    (多邻国自己记的会话时长,与 App 内显示同口径),xp = gainedXp。
+    没学的天(sessions 与 xp 都为 0,例如冻结日)不产生条目——绿墙里缺 = 没学。
+    """
+    out = {}
+    for x in summaries or []:
+        ts = x.get("date")
+        if ts is None:
+            continue
+        sessions = x.get("numSessions") or 0
+        xp = x.get("gainedXp") or 0
+        if sessions <= 0 and xp <= 0:
+            continue
+        out[day_key(int(ts))] = {
+            "lessons": sessions,
+            "minutes": round((x.get("totalSessionTime") or 0) / 60),
+            "xp": xp,
+        }
+    return out
+
+
+def fetch_xp_summaries(token, start: str, end: str):
+    """拉 [start, end] 的按天汇总;失败返回 None(调用方据此报红,不静默提交残缺 daily)。"""
+    url = f"{SUMMARY_API}?startDate={start}&endDate={end}&timezone=Asia%2FShanghai&_={int(time.time())}"
+    try:
+        d = get_json(url, auth=token)
+    except Exception as e:
+        print(f"xp_summaries fetch failed: {e}", file=sys.stderr)
+        return None
+    return summaries_to_daily(d.get("summaries") if isinstance(d, dict) else None)
+
+
 def fetch_daily_detail(token):
-    """带 JWT 拉逐课记录,聚合成 {date: {lessons, minutes, xp}}。失败返回空。"""
+    """带 JWT 拉每日明细 {date: {lessons, minutes, xp}} + 课程状态。任一接口失败返回 None。
+
+    daily 只认 xp_summaries(真实时长、可回溯全程);用户档案(xpGains / currentCourse)
+    负责单元完成日、升分日和课程状态。
+    """
     try:
         # ?_= 时间戳当 cache-buster:固定值可能吃到接口缓存,当天早晨的课迟迟不进 xpGains
         u = get_json(f"{AUTH_API}?_={int(time.time())}", auth=token)
@@ -238,21 +277,15 @@ def fetch_daily_detail(token):
             f"auth profile missing: {missing}; top-level keys: {sorted(u.keys())}",
             file=sys.stderr,
         )
-    byday = defaultdict(list)
-    for g in u.get("xpGains") or []:
-        byday[day_key(g["time"])].append(g)
-    detail = {}
-    for d, gains in byday.items():
-        times = sorted(g["time"] for g in gains)
-        secs = LAST_LESSON_MIN * 60
-        for a, b in zip(times, times[1:]):
-            if b - a < GAP_MAX:
-                secs += b - a
-        detail[d] = {
-            "lessons": len(times),
-            "minutes": round(secs / 60),
-            "xp": sum(g["xp"] for g in gains),
-        }
+    # DUOLINGO_SUMMARY_START 可指定回看起点(一次性回填全程用)
+    end = datetime.now(TZ).date().isoformat()
+    start = os.environ.get("DUOLINGO_SUMMARY_START") or (
+        datetime.now(TZ) - timedelta(days=SUMMARY_DAYS)
+    ).date().isoformat()
+    detail = fetch_xp_summaries(token, start, end)
+    if detail is None:
+        return None
+    print(f"xp_summaries {start}~{end}: {len(detail)} active days")
     unit_done, score_reached = extract_unit_progress(u.get("currentCourse"), u.get("xpGains"))
     extra = {
         "sections": fetch_course_progress(u),
@@ -398,7 +431,7 @@ def main():
             # JWT 存在却拉失败,大概率过期:宁可让 workflow 变红,
             # 也不要静默提交一份没有明细的快照,把每日曲线悄悄断掉。
             raise SystemExit(
-                "DUOLINGO_JWT is set but the auth fetch failed (token likely expired). "
+                "DUOLINGO_JWT is set but the auth/xp_summaries fetch failed (token likely expired). "
                 "Update the GitHub Secret, then re-run this workflow."
             )
         detail, extra = result

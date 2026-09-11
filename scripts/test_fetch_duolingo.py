@@ -11,11 +11,12 @@
   - snapshot_day:快照行归日,凌晨 5 点前算前一天(CI 定时漂移到凌晨跑,进度不能记成次日)
   - extract_score_info:多邻国分数/满分提取、下一分单元取当前分数带末单元、完成单元数夹紧
   - extract_unit_progress:逐课时间戳反推单元完成日与升分日(窗口截断、跨午夜、skillId 歧义)
+  - summaries_to_daily:xp_summaries → daily(真实时长四舍五入、没学的天不产生条目、归日北京时间)
   - normalize_token:剥掉手滑带上的 Bearer 前缀(2026-08-17 本地排查时踩过的坑)
 """
 import importlib.util
 import unittest
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 _spec = importlib.util.spec_from_file_location(
@@ -432,6 +433,33 @@ class ExtractUnitProgressTest(unittest.TestCase):
     def test_empty_inputs(self):
         self.assertEqual(fd.extract_unit_progress(None, None), ({}, {}))
         self.assertEqual(fd.extract_unit_progress({}, []), ({}, {}))
+
+
+class SummariesToDailyTest(unittest.TestCase):
+    def test_maps_fields_and_rounds_minutes(self):
+        ts = int(datetime(2026, 9, 9, 0, 0, tzinfo=fd.TZ).timestamp())
+        out = fd.summaries_to_daily(
+            [{"date": ts, "numSessions": 26, "totalSessionTime": 5820, "gainedXp": 1086}]
+        )
+        self.assertEqual(out, {"2026-09-09": {"lessons": 26, "minutes": 97, "xp": 1086}})
+
+    def test_idle_days_dropped(self):
+        ts = int(datetime(2026, 8, 5, 0, 0, tzinfo=fd.TZ).timestamp())
+        out = fd.summaries_to_daily(
+            [{"date": ts, "numSessions": 0, "totalSessionTime": 0, "gainedXp": 0, "frozen": True}]
+        )
+        self.assertEqual(out, {})
+
+    def test_day_key_is_beijing(self):
+        # 多邻国给的 date 是 UTC 当天 0 点:北京时间同日 08:00,归同一天
+        ts = int(datetime(2026, 7, 27, 0, 0, tzinfo=timezone.utc).timestamp())
+        out = fd.summaries_to_daily([{"date": ts, "numSessions": 1, "totalSessionTime": 401, "gainedXp": 23}])
+        self.assertEqual(list(out), ["2026-07-27"])
+        self.assertEqual(out["2026-07-27"]["minutes"], 7)
+
+    def test_empty_input(self):
+        self.assertEqual(fd.summaries_to_daily(None), {})
+        self.assertEqual(fd.summaries_to_daily([]), {})
 
 
 class FetchCourseProgressTest(unittest.TestCase):
