@@ -26,13 +26,14 @@ python3 scripts/fetch-duolingo.py   # 手动跑多邻国采集(见下)
 
 ## 架构
 
-### 数据流(三条独立管道)
+### 数据流(四条独立管道)
 
 1. **构建时注入**:`prebuild` 跑 `npm run data` = `scripts/fetch-repos.ts`(拉仓库列表 → `src/data/repos.json`,gitignored,CI 用 `GITHUB_TOKEN`、本地匿名超限沿用旧文件)+ `scripts/gen-static.ts`(从 `content/posts` 生成 `public/rss.xml`/`sitemap.xml`/`robots.txt`,均 gitignored,域名取自 `site.config.ts`)。
 2. **每日定时采集**:`.github/workflows/duolingo.yml` 每天 2 次(cron 写的是北京 09:13 / 23:13,**GitHub 定时实测漂移 3~5 小时**,实跑约 12~14 点和次日凌晨 2~4 点;2026-08-21 从 4 次精简,2026-09-11 晚班从 21:13 改 23:13)跑 `scripts/fetch-duolingo.py` → 更新 `data/duolingo-history.json` → 自动 commit(同日重跑覆盖,每天只留一条快照;**快照行的"今天"在北京凌晨 5 点前算前一天**(`snapshot_day()`/`DAY_ROLLOVER_HOUR`),所以漂到凌晨的晚班正好是前一天的收尾——2026-09-11 前按自然日归,把 9/8 晚学出来的 17 分记成了 9/9;傍晚后 xpGains 滞后的课由次日早班回填)。token 走 Secret `DUOLINGO_JWT`,**绝不进代码**,且必须由 workflow fetch step 的 `env:` 映射注入脚本——**漏了这行 CI 会静默退化成无明细模式**(2026-08-17 发现从建仓起就漏着,日明细一直靠本地跑续命;脚本已在 CI 缺 token 时直接报红防复发)。两个坑:
    - **snapshot 的 commit 不会触发 `on: push`**(GITHUB_TOKEN 推送防循环规则),部署靠 `deploy.yml` 的 `workflow_run` 监听 snapshot workflow 完成来触发;
    - **xpGains 对当天数据有数小时滞后**,白天手动跑可能缺当天明细(daily 里没有当天 key 时页面整行不展示——不做 totalXp 差值兜底,差值窗口横跨前一晚会把昨晚 XP 算成今天的),以 21:13 定时跑 + 次日 09:13 回填为准。
 3. **博客内容**:`content/posts/*.mdx` 经 `import.meta.glob` eager 加载(`src/lib/posts.ts`)。**MDX 正文是 default export,不是命名 export**——这是曾导致文章页空白的坑。
+4. **Notes 复习笔记**(2026-09-14 起):`content/notes/*.mdx` 经 `src/lib/notes.ts` 加载,路由 `/notes` 列表 + `/notes/:slug` 详情。定位是"经常蒙的点的小总结,每天学习前过一遍",内容中文、活文档:frontmatter 用 `updated`(最后修订日)不用 `date`,**不进 RSS**,只进 sitemap(`gen-static.ts` 的 `readCollection`),**不进顶部导航**,入口是 English 页面的 Review notes 卡片(列前 5 篇)。frontmatter 可带 `order`(列表按 order 升序,再按 updated 降序);A1 系列 5 篇按学习顺序 1~5,只有第 1 篇是已学内容,其余 4 篇标 `预习` tag,例句取自多邻国各单元官方 guidebook(接口 `pathSectioned[].units[].guidebook.url`),学到对应单元时补充。笔记里可 import 交互组件:`src/components/Quiz.tsx`(自测题:中文题面 + 输入框,回车看答案并按忽略大小写/标点的规则判对错,`a` 可给多个可接受答案;纯临时状态不持久化),MDX 里 `import Quiz from '../../src/components/Quiz'`;嵌进正文的组件外层加 `not-prose` 免受 `.prose` 列表样式影响。正文排版与博客共用 `src/index.css` 的 `.prose`(含表格样式);MDX 管道靠 `remark-gfm` 认 GFM 表格,笔记大量用表格,别删。
 
 ### 多邻国数据的关键设计
 

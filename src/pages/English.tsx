@@ -1,6 +1,8 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import history from '../../data/duolingo-history.json'
+import { Link } from 'react-router-dom'
 import { Card, SectionTitle, SectionSubtitle } from '../components/ui'
+import { notes } from '../lib/notes'
 import { usePageTitle } from '../hooks/usePageTitle'
 
 interface DayDetail {
@@ -1054,6 +1056,32 @@ export default function English() {
           More
         </div>
       </Card>
+
+      {/* Review notes:经常蒙的点的小总结,学习前过一遍;列表页 /notes 不进顶部导航 */}
+      {notes.length > 0 && (
+        <Card>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-medium text-gray-300">Review notes</h2>
+            <Link to="/notes" className="text-xs text-gray-500 hover:text-cyan-300">
+              All notes →
+            </Link>
+          </div>
+          <ul className="space-y-2">
+            {notes.slice(0, 5).map((n) => (
+              <li key={n.slug}>
+                <Link
+                  to={`/notes/${n.slug}`}
+                  className="group flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1"
+                >
+                  <span className="text-gray-100 group-hover:text-cyan-300">{n.title}</span>
+                  <span className="font-mono text-xs text-gray-500">updated {n.updated}</span>
+                </Link>
+                {n.excerpt && <p className="mt-0.5 text-xs text-gray-500">{n.excerpt}</p>}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
       <p className="text-sm text-gray-500">
         Data source: Duolingo API (updated daily via GitHub Actions). Longest streak{' '}

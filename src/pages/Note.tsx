@@ -1,28 +1,28 @@
 import { Link, useParams } from 'react-router-dom'
-import { getPost } from '../lib/posts'
-import Comments from '../components/Comments'
+import { getNote } from '../lib/notes'
 import NotFound from './NotFound'
 import { usePageTitle } from '../hooks/usePageTitle'
 
-export default function Post() {
+/** 单篇复习笔记:正文排版复用 .prose(与博客同一套,含表格样式);活文档不挂评论 */
+export default function Note() {
   const { slug } = useParams()
-  const post = slug ? getPost(slug) : undefined
+  const note = slug ? getNote(slug) : undefined
 
-  usePageTitle(post?.frontmatter.title)
+  usePageTitle(note?.frontmatter.title)
 
-  if (!post) return <NotFound />
+  if (!note) return <NotFound />
 
-  const { Content, frontmatter } = post
+  const { Content, frontmatter } = note
 
   return (
     <article className="space-y-6">
       <header className="space-y-3 border-b border-gray-800 pb-6">
-        <Link to="/blog" className="text-sm text-gray-500 hover:text-gray-300">
-          ← Back to blog
+        <Link to="/notes" className="text-sm text-gray-500 hover:text-gray-300">
+          ← Back to notes
         </Link>
         <h1 className="text-3xl font-bold">{frontmatter.title}</h1>
         <div className="flex items-center gap-3 text-sm text-gray-500">
-          <time>{frontmatter.date}</time>
+          <time>updated {frontmatter.updated}</time>
           {frontmatter.tags?.map((t) => (
             <span key={t} className="tag">
               {t}
@@ -33,7 +33,6 @@ export default function Post() {
       <div className="prose">
         <Content />
       </div>
-      <Comments />
     </article>
   )
 }

@@ -7,6 +7,8 @@ import Blog from './pages/Blog'
 import Post from './pages/Post'
 import Now from './pages/Now'
 import English from './pages/English'
+import Notes from './pages/Notes'
+import Note from './pages/Note'
 import NotFound from './pages/NotFound'
 
 export default function App() {
@@ -20,6 +22,9 @@ export default function App() {
         <Route path="/blog/:slug" element={<Post />} />
         <Route path="/now" element={<Now />} />
         <Route path="/english" element={<English />} />
+        {/* Notes 不进顶部导航,从 English 页面进入 */}
+        <Route path="/notes" element={<Notes />} />
+        <Route path="/notes/:slug" element={<Note />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Layout>

@@ -11,6 +11,7 @@ import { site } from '../src/site.config'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const POSTS_DIR = join(__dirname, '../content/posts')
+const NOTES_DIR = join(__dirname, '../content/notes')
 const PUB = join(__dirname, '../public')
 
 interface PostMeta {
@@ -20,20 +21,28 @@ interface PostMeta {
   excerpt?: string
 }
 
-/** 从 MDX 源码解析 frontmatter 字面量(受控格式:key: 'value') */
-function parseFrontmatter(file: string): PostMeta | null {
-  const src = readFileSync(join(POSTS_DIR, file), 'utf8')
+/** 从 MDX 源码解析 frontmatter 字面量(受控格式:key: 'value');dateKey = 文章 date / 笔记 updated */
+function parseFrontmatter(dir: string, file: string, dateKey: 'date' | 'updated'): PostMeta | null {
+  const src = readFileSync(join(dir, file), 'utf8')
   const m = src.match(/export\s+const\s+frontmatter\s*=\s*\{([\s\S]*?)\n\}/)
   if (!m) return null
   const body = m[1]
   const pick = (key: string) => body.match(new RegExp(`${key}:\\s*(['"])(.*?)\\1`))?.[2]
   const title = pick('title')
-  const date = pick('date')
+  const date = pick(dateKey)
   if (!title || !date) {
-    console.warn(`${file}: frontmatter missing title/date, skipped`)
+    console.warn(`${file}: frontmatter missing title/${dateKey}, skipped`)
     return null
   }
   return { slug: file.replace(/\.mdx$/, ''), title, date, excerpt: pick('excerpt') }
+}
+
+function readCollection(dir: string, dateKey: 'date' | 'updated'): PostMeta[] {
+  return readdirSync(dir)
+    .filter((f) => f.endsWith('.mdx'))
+    .map((f) => parseFrontmatter(dir, f, dateKey))
+    .filter((p): p is PostMeta => p !== null)
+    .sort((a, b) => b.date.localeCompare(a.date))
 }
 
 /** XML 文本转义 */
@@ -46,11 +55,9 @@ function esc(s: string): string {
 }
 
 function main() {
-  const posts = readdirSync(POSTS_DIR)
-    .filter((f) => f.endsWith('.mdx'))
-    .map(parseFrontmatter)
-    .filter((p): p is PostMeta => p !== null)
-    .sort((a, b) => b.date.localeCompare(a.date))
+  const posts = readCollection(POSTS_DIR, 'date')
+  // 笔记只进 sitemap,不进 RSS(活文档,没有"发布"语义)
+  const notes = readCollection(NOTES_DIR, 'updated')
 
   const base = site.siteUrl
   const today = new Date().toISOString().slice(0, 10)
@@ -87,6 +94,8 @@ ${posts
     { loc: '/now', lastmod: today },
     { loc: '/english', lastmod: today },
     ...posts.map((p) => ({ loc: `/blog/${p.slug}`, lastmod: p.date })),
+    { loc: '/notes', lastmod: today },
+    ...notes.map((n) => ({ loc: `/notes/${n.slug}`, lastmod: n.date })),
   ]
   const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
