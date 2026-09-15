@@ -2,7 +2,6 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import history from '../../data/duolingo-history.json'
 import { Link } from 'react-router-dom'
 import { Card, SectionTitle, SectionSubtitle } from '../components/ui'
-import { notes } from '../lib/notes'
 import { usePageTitle } from '../hooks/usePageTitle'
 
 interface DayDetail {
@@ -690,20 +689,21 @@ function CefrArc() {
           </g>
         )}
         {cur && (
-          <>
-            <text x={cx} y={cy - 58} textAnchor="middle" fontSize="44" fontWeight="800" letterSpacing="-1" fill={cefrColor(cur.cefr)}>
+          // 中心整块是链接:点当前段位进学习路径页(多邻国风格的单元路径 + 各部分官方指南)
+          <Link to="/english/learn" className="group cursor-pointer" aria-label="Open learning path">
+            <text x={cx} y={cy - 58} textAnchor="middle" fontSize="44" fontWeight="800" letterSpacing="-1" fill={cefrColor(cur.cefr)} className="transition-opacity group-hover:opacity-80">
               {cur.cefr}
             </text>
             <text x={cx} y={cy - 36} textAnchor="middle" fontSize="12" fontFamily="ui-monospace, monospace" className="fill-gray-400">
               {cur.done} / {cur.total} units · {curPct}%
             </text>
-            <text x={cx} y={cy - 18} textAnchor="middle" fontSize="9" letterSpacing="2" className="fill-gray-500">
-              CURRENT LEVEL
+            <text x={cx} y={cy - 18} textAnchor="middle" fontSize="9" letterSpacing="2" className="fill-gray-500 group-hover:fill-cyan-300">
+              CURRENT LEVEL · OPEN PATH →
             </text>
             <text x={cx} y={cy - 2} textAnchor="middle" fontSize="10" className="fill-gray-400">
               {cur.total - cur.done} units to go{eta ? ` · ETA ${eta}` : ''}
             </text>
-          </>
+          </Link>
         )}
       </svg>
       <div className="flex flex-wrap justify-center gap-x-5 gap-y-1 text-xs text-gray-400">
@@ -1056,32 +1056,6 @@ export default function English() {
           More
         </div>
       </Card>
-
-      {/* Review notes:经常蒙的点的小总结,学习前过一遍;列表页 /notes 不进顶部导航 */}
-      {notes.length > 0 && (
-        <Card>
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-medium text-gray-300">Review notes</h2>
-            <Link to="/notes" className="text-xs text-gray-500 hover:text-cyan-300">
-              All notes →
-            </Link>
-          </div>
-          <ul className="space-y-2">
-            {notes.slice(0, 5).map((n) => (
-              <li key={n.slug}>
-                <Link
-                  to={`/notes/${n.slug}`}
-                  className="group flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1"
-                >
-                  <span className="text-gray-100 group-hover:text-cyan-300">{n.title}</span>
-                  <span className="font-mono text-xs text-gray-500">updated {n.updated}</span>
-                </Link>
-                {n.excerpt && <p className="mt-0.5 text-xs text-gray-500">{n.excerpt}</p>}
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
 
       <p className="text-sm text-gray-500">
         Data source: Duolingo API (updated daily via GitHub Actions). Longest streak{' '}

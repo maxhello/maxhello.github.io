@@ -11,7 +11,6 @@ import { site } from '../src/site.config'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const POSTS_DIR = join(__dirname, '../content/posts')
-const NOTES_DIR = join(__dirname, '../content/notes')
 const PUB = join(__dirname, '../public')
 
 interface PostMeta {
@@ -56,8 +55,6 @@ function esc(s: string): string {
 
 function main() {
   const posts = readCollection(POSTS_DIR, 'date')
-  // 笔记只进 sitemap,不进 RSS(活文档,没有"发布"语义)
-  const notes = readCollection(NOTES_DIR, 'updated')
 
   const base = site.siteUrl
   const today = new Date().toISOString().slice(0, 10)
@@ -93,9 +90,8 @@ ${posts
     { loc: '/blog', lastmod: today },
     { loc: '/now', lastmod: today },
     { loc: '/english', lastmod: today },
+    { loc: '/english/learn', lastmod: today },
     ...posts.map((p) => ({ loc: `/blog/${p.slug}`, lastmod: p.date })),
-    { loc: '/notes', lastmod: today },
-    ...notes.map((n) => ({ loc: `/notes/${n.slug}`, lastmod: n.date })),
   ]
   const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">

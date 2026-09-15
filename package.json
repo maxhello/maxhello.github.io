@@ -8,6 +8,7 @@
     "dev": "npm run data && vite",
     "prebuild": "npm run data",
     "build": "tsc -b && vite build",
+    "guidebooks": "python3 scripts/fetch-guidebooks.py",
     "test:py": "python3 scripts/test_fetch_duolingo.py",
     "preview": "vite preview"
   },

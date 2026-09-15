@@ -20,6 +20,7 @@ npm run build      # tsc -b && vite build(先跑 prebuild → data 脚本)
 npx vite preview   # 预览 dist
 npm run test:py    # 多邻国脚本纯逻辑单测(stdlib unittest,零依赖)
 python3 scripts/fetch-duolingo.py   # 手动跑多邻国采集(见下)
+npm run guidebooks                  # 手动拉多邻国单元指南 → data/duolingo-guidebooks.json(需 DUOLINGO_JWT,本地加 DUOLINGO_INSECURE=1)
 ```
 
 除 `test:py` 外没有测试、没有 lint。验证方式 = `npm run build` 通过 + `npm run test:py` 通过 + 本地预览。
@@ -33,7 +34,8 @@ python3 scripts/fetch-duolingo.py   # 手动跑多邻国采集(见下)
    - **snapshot 的 commit 不会触发 `on: push`**(GITHUB_TOKEN 推送防循环规则),部署靠 `deploy.yml` 的 `workflow_run` 监听 snapshot workflow 完成来触发;
    - **xpGains 对当天数据有数小时滞后**,白天手动跑可能缺当天明细(daily 里没有当天 key 时页面整行不展示——不做 totalXp 差值兜底,差值窗口横跨前一晚会把昨晚 XP 算成今天的),以 21:13 定时跑 + 次日 09:13 回填为准。
 3. **博客内容**:`content/posts/*.mdx` 经 `import.meta.glob` eager 加载(`src/lib/posts.ts`)。**MDX 正文是 default export,不是命名 export**——这是曾导致文章页空白的坑。
-4. **Notes 复习笔记**(2026-09-14 起):`content/notes/*.mdx` 经 `src/lib/notes.ts` 加载,路由 `/notes` 列表 + `/notes/:slug` 详情。定位是"经常蒙的点的小总结,每天学习前过一遍",内容中文、活文档:frontmatter 用 `updated`(最后修订日)不用 `date`,**不进 RSS**,只进 sitemap(`gen-static.ts` 的 `readCollection`),**不进顶部导航**,入口是 English 页面的 Review notes 卡片(列前 5 篇)。frontmatter 可带 `order`(列表按 order 升序,再按 updated 降序);A1 系列 5 篇按学习顺序 1~5,只有第 1 篇是已学内容,其余 4 篇标 `预习` tag,例句取自多邻国各单元官方 guidebook(接口 `pathSectioned[].units[].guidebook.url`),学到对应单元时补充。笔记里可 import 交互组件:`src/components/Quiz.tsx`(自测题:中文题面 + 输入框,回车看答案并按忽略大小写/标点的规则判对错,`a` 可给多个可接受答案;纯临时状态不持久化),MDX 里 `import Quiz from '../../src/components/Quiz'`;嵌进正文的组件外层加 `not-prose` 免受 `.prose` 列表样式影响。正文排版与博客共用 `src/index.css` 的 `.prose`(含表格样式);MDX 管道靠 `remark-gfm` 认 GFM 表格,笔记大量用表格,别删。
+4. **单元指南 + 学习路径页**(2026-09-15 起):`scripts/fetch-guidebooks.py`(`npm run guidebooks`,手动)拉多邻国 App 里每部分的"指南"→ `data/duolingo-guidebooks.json`(已提交,~400KB,**走动态 import 单独 chunk,只在 `/english/learn` 加载**,gzip ~70KB)。来源 `currentCourse.pathSectioned[].units[].guidebook.url`(CDN JSON,地址带哈希须先拿课程结构)。每单元存:`keySentences[]{en, zh(subtext 官方中文), tts(整句读音), words[]{w, hints[≤2], tts}}`(hints 来自 blockHints 的 hintTable,cell colspan>1 是词组释义;单字拆字释义有更长的就丢)+ `grammar[]{title, blocks[]{text|example{en,zh,tts}|table{rows}}}`。文本样式规律:fontSize 17 青色 = 分区标题,fontSize 25 加粗 = 语法点标题,其余正文,bold 片段保留 `**…**`。读音 mp3 公共前缀提到顶层 `ttsBase`,文件里只存哈希;CDN 公开可访问,浏览器 `new Audio()` 直接播。默认拉到当前 section 的下一段为止(现在 Intro+A1 共 70 单元),增量不重拉,`DUOLINGO_GUIDEBOOK_REFRESH=1` 全量、`DUOLINGO_GUIDEBOOK_SECTIONS=N` 指定段数。约一半单元没有语法点(70 里 32 有)。进入 A2 前手动跑一次,否则路径页该段显示"未缓存"。**不在 CI 定时跑**。
+   消费方:`src/pages/Learn.tsx`(路由 `/english/learn`,参考多邻国 learn 页结构:顶部当前阶段横幅 + 蛇形节点路径 + 点节点开指南抽屉;进页在 useLayoutEffect 里 `scrollIntoView({behavior:'instant'})` 瞬时定位到当前节点(全站 html 是 smooth,不显式 instant 会看到往下滑);`?unit=<unitIndex>` 直接开某部分)+ `src/components/UnitGuide.tsx`(数据类型、`useGuidebooks()`、`UnitGuideBody`:句子喇叭读整句、点词弹释义并读该词、英文下中文)。样式在 index.css 的 learning path 区(`.btn-chunky/.path-banner/.path-node-*/.path-drawer`),**只借鉴布局交互,不用多邻国商标/配色/素材**。当前单元 = 最近一份带 `score.lastUnitDone` 的快照 + 1(`unitIndex` 是 API 的 0-based 全局编号;App 里"第 N 阶段第 M 部分" = `section+1` / `unitInSection`)。English 页不展示指南内容,入口 = CEFR journey 弧中心的段位文字整块是 Link("CURRENT LEVEL · OPEN PATH →"),不另开卡片。
 
 ### 多邻国数据的关键设计
 

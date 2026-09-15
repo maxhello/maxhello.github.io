@@ -226,7 +226,7 @@ body {
   font-weight: 600;
 }
 
-/* ── 长文排版:博客正文与 Notes 正文共用(站点恒为 dark,不留 light 变体) ── */
+/* ── 长文排版:博客正文(站点恒为 dark,不留 light 变体) ── */
 .prose {
   line-height: 1.7;
 }
@@ -308,50 +308,6 @@ body {
   background: rgb(255 255 255 / 0.02);
 }
 
-/* 折叠自测题:summary 是中文题面,点开显示英文答案 */
-.prose details {
-  border: 1px solid rgb(31 41 55 / 0.8);
-  border-radius: 0.5rem;
-  background: rgb(11 18 32 / 0.6);
-  padding: 0.5rem 0.875rem;
-}
-.prose details + details {
-  margin-top: 0.5rem;
-}
-.prose summary {
-  cursor: pointer;
-  color: #e5e7eb;
-  list-style: none;
-}
-.prose summary::before {
-  content: '▸';
-  display: inline-block;
-  width: 1.1rem;
-  color: #67e8f9;
-  transition: transform 0.15s;
-}
-.prose details[open] summary::before {
-  transform: rotate(90deg);
-}
-.prose details[open] summary {
-  color: #9ca3af;
-}
-.prose details > p {
-  margin-top: 0.5rem;
-  padding-left: 1.1rem;
-  color: #d1d5db;
-}
-
-/* 正文里嵌的交互组件(如 Quiz)不吃 .prose 的列表样式 */
-.prose .not-prose ol,
-.prose .not-prose ul {
-  list-style: none;
-  padding-left: 0;
-}
-.prose .not-prose li + li {
-  margin-top: 0;
-}
-
 /* ═══════════════════════════════════════════════════
    hero-scoped:首页 Hero 与编号区块专用样式
    ═══════════════════════════════════════════════════ */
@@ -420,4 +376,134 @@ body {
     transform: none;
     transition: none;
   }
+}
+
+/* ═══════════════════════════════════════════════════
+   learning path(/english/learn):多邻国式路径与指南抽屉,站点配色
+   ═══════════════════════════════════════════════════ */
+
+/* 厚底立体按钮 */
+.btn-chunky {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.875rem;
+  padding: 0.625rem 1.25rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #031018;
+  background: #22d3ee;
+  border-bottom: 4px solid #0e7490;
+  transition: transform 0.08s, border-bottom-width 0.08s, filter 0.15s;
+  white-space: nowrap;
+}
+.btn-chunky:hover { filter: brightness(1.08); }
+.btn-chunky:active { transform: translateY(3px); border-bottom-width: 1px; }
+
+/* 当前阶段横幅 */
+.path-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  max-width: 100%;
+  border-radius: 1rem;
+  padding: 1.1rem 1.25rem;
+  background: linear-gradient(135deg, #0e7490 0%, #1d4ed8 60%, #6d28d9 100%);
+  box-shadow: 0 8px 0 0 rgb(8 47 73 / 0.9);
+}
+.path-banner .btn-chunky {
+  background: rgb(255 255 255 / 0.92);
+  color: #0e7490;
+  border-bottom-color: rgb(3 16 24 / 0.35);
+}
+
+/* 路径节点:圆形立体按钮 */
+.path-node {
+  width: 4.25rem;
+  height: 4.25rem;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: 800;
+  border-bottom: 6px solid transparent;
+  transition: transform 0.08s, border-bottom-width 0.08s, box-shadow 0.2s;
+}
+.path-node:active { transform: translateY(4px); border-bottom-width: 2px; }
+.path-node-done {
+  background: #22d3ee;
+  border-bottom-color: #0e7490;
+  color: #031018;
+}
+.path-node-current {
+  background: linear-gradient(180deg, #a78bfa, #7c3aed);
+  border-bottom-color: #4c1d95;
+  color: #fff;
+  box-shadow: 0 0 0 6px rgb(3 7 18), 0 0 0 9px rgb(167 139 250 / 0.6);
+}
+.path-node-locked {
+  background: #1f2937;
+  border-bottom-color: #0f172a;
+  color: #4b5563;
+  font-size: 1.1rem;
+}
+.path-node-active { box-shadow: 0 0 0 4px rgb(3 7 18), 0 0 0 7px #22d3ee; }
+
+@keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+.path-start { animation: bob 1.6s ease-in-out infinite; }
+
+/* 读音按钮:圆角实心块 + 厚底(多邻国式),小号用于语法例句 */
+.speaker-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.75rem;
+  color: #fff;
+  background: linear-gradient(180deg, #38bdf8, #0ea5e9);
+  border-bottom: 4px solid #0369a1;
+  transition: transform 0.08s, border-bottom-width 0.08s, filter 0.15s;
+}
+.speaker-btn:hover { filter: brightness(1.08); }
+.speaker-btn:active,
+.speaker-btn-active { transform: translateY(3px); border-bottom-width: 1px; }
+.speaker-btn-sm {
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 0.55rem;
+  border-bottom-width: 3px;
+}
+.speaker-btn-sm:active,
+.speaker-btn-sm.speaker-btn-active { transform: translateY(2px); border-bottom-width: 1px; }
+
+/* 指南抽屉:桌面右侧面板,手机底部抽屉 */
+.path-drawer {
+  position: fixed;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  background: #0b1220;
+  border: 1px solid rgb(31 41 55 / 0.9);
+  padding: 1.25rem;
+  inset: auto 0 0 0;
+  max-height: 88vh;
+  border-radius: 1.25rem 1.25rem 0 0;
+}
+@media (min-width: 768px) {
+  .path-drawer {
+    inset: 0 0 0 auto;
+    width: min(30rem, 100vw);
+    max-height: none;
+    border-radius: 0;
+    border-width: 0 0 0 1px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .path-start { animation: none; }
 }
