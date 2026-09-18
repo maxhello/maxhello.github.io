@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import history from '../../data/duolingo-history.json'
 import { Link } from 'react-router-dom'
 import { Card, SectionTitle, SectionSubtitle } from '../components/ui'
@@ -347,7 +347,7 @@ function ScoreBandChart() {
   const dayN = levelSince ? dayDiff(levelSince.date, todayIso) + 1 : null
 
   return (
-    <div className="flex w-full min-w-0 max-w-[340px] flex-col items-center gap-1 justify-self-center">
+    <div className="flex w-full min-w-0 max-w-[240px] flex-col items-center gap-1 justify-self-center">
       <svg
         ref={ref}
         viewBox={`0 0 ${W} ${H}`}
@@ -874,16 +874,44 @@ function DailyChart() {
   )
 }
 
-function Stat({ value, label }: { value: string; label: string }) {
+/** Pulse 条右侧:最近 7 天每日 XP 的迷你柱,今天高亮,悬停看数值 */
+function WeekBars() {
+  if (last7.length === 0) return null
+  const max = Math.max(1, ...last7.map((d) => d.xp))
   return (
-    <Card className="text-center">
-      <div className="text-2xl font-bold heading-gradient">{value}</div>
-      <div className="mt-1 text-xs text-gray-500">{label}</div>
-    </Card>
+    <div className="flex h-9 items-end gap-1" aria-hidden>
+      {last7.map((d) => (
+        <div
+          key={d.date}
+          title={`${d.date}: ${d.xp} XP, ${d.minutes} min`}
+          className={`w-2 rounded-sm ${
+            d.date === todayIso
+              ? 'bg-cyan-300 shadow-[0_0_8px_rgb(103_232_249_/_0.6)]'
+              : d.xp > 0
+                ? 'bg-cyan-400/55'
+                : 'bg-gray-800'
+          }`}
+          style={{ height: `${Math.max(8, (d.xp / max) * 100)}%` }}
+        />
+      ))}
+    </div>
   )
 }
 
-/** 打卡绿墙:日历周对齐(周一起始),列数无上限;初始滚动到最右(最新一周),更早的向左滑查看 */
+/** Activity 卡下半的累计数字:等宽小字,不和 streak 抢焦点 */
+function Fact({ value, label }: { value: string; label: string }) {
+  return (
+    <div>
+      <div className="font-mono text-lg font-semibold tabular-nums text-gray-100">{value}</div>
+      <div className="mt-0.5 text-[11px] text-gray-500">{label}</div>
+    </div>
+  )
+}
+
+const Eyebrow = ({ children }: { children: ReactNode }) => (
+  <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-gray-500">{children}</div>
+)
+
 function ActivityWall() {
   const scrollRef = useRef<HTMLDivElement>(null)
   useLayoutEffect(() => {
@@ -900,7 +928,7 @@ function ActivityWall() {
           </span>
         ))}
       </div>
-      <div ref={scrollRef} className="flex gap-1 overflow-x-auto pb-1">
+      <div ref={scrollRef} className="flex min-w-0 gap-1 overflow-x-auto pb-1">
         {Array.from({ length: Math.ceil(wallDays.length / 7) }, (_, w) => (
           <div key={w} className="flex flex-col gap-1">
             {wallDays.slice(w * 7, w * 7 + 7).map((d) => {
@@ -944,7 +972,7 @@ export default function English() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div>
         <SectionTitle>English Learning</SectionTitle>
         <SectionSubtitle>
@@ -952,17 +980,18 @@ export default function English() {
         </SectionSubtitle>
       </div>
 
-      {/* Hero 三栏:今日数据 · 当前段分数走势 · 段位徽章(手机端竖排) */}
-      <Card className="grid items-center gap-5 p-6 sm:grid-cols-[12rem_minmax(0,1fr)_11.5rem]">
-        <div className="text-center sm:text-left">
-          <div className="font-mono text-xs text-gray-500">TODAY · {todayIso}</div>
-          <div className="mt-2 flex items-baseline justify-center gap-2 sm:justify-start">
-            <span className="text-5xl font-bold heading-gradient">{streakN}</span>
-            <span className="text-sm text-gray-400">day streak 🔥</span>
-          </div>
+      {/* 1 · Pulse:streak · 今日 · 近 7 天,一条横条(手机端折行) */}
+      <Card className="flex flex-wrap items-center gap-x-7 gap-y-3.5 px-6 py-4">
+        <div className="flex items-baseline gap-2">
+          <span className="text-5xl font-bold leading-none tracking-tight heading-gradient">{streakN}</span>
+          <span className="text-sm text-gray-400">day streak 🔥</span>
+        </div>
+        <div className="hidden h-10 w-px bg-gray-800 sm:block" />
+        <div>
+          <Eyebrow>Today · {todayIso}</Eyebrow>
           {todayDetail ? (
             todayDetail.lessons > 0 ? (
-              <div className="mt-3 flex justify-center gap-4 text-sm whitespace-nowrap sm:justify-start">
+              <div className="mt-1 flex gap-3.5 text-sm whitespace-nowrap">
                 <span>
                   <span className="font-bold text-cyan-300">{todayDetail.xp}</span>
                   <span className="ml-1 text-gray-500">XP</span>
@@ -978,7 +1007,7 @@ export default function English() {
               </div>
             ) : (
               // 有 XP 但 lessons=0:daily 明细还没同步(xpGains 当天滞后),别显示误导性的 0 分钟
-              <div className="mt-3 flex items-baseline gap-5 text-sm">
+              <div className="mt-1 flex items-baseline gap-4 text-sm">
                 <span>
                   <span className="font-bold text-cyan-300">{todayDetail.xp}</span>
                   <span className="ml-1 text-gray-500">XP</span>
@@ -987,45 +1016,50 @@ export default function English() {
               </div>
             )
           ) : (
-            <p className="mt-3 text-sm text-gray-500">No lessons yet today 🦉</p>
+            <p className="mt-1 text-sm text-gray-500">No lessons yet today 🦉</p>
           )}
         </div>
-        <ScoreBandChart />
-        <ScoreBadge />
+        <div className="flex w-full items-center justify-between gap-3.5 sm:ml-auto sm:w-auto sm:justify-start">
+          <div className="sm:text-right">
+            <Eyebrow>Last 7 days</Eyebrow>
+            <div className="mt-1 font-mono text-sm tabular-nums whitespace-nowrap">
+              <span className="font-bold text-cyan-300">{weekXp.toLocaleString()}</span>
+              <span className="ml-1 text-gray-500">XP</span>
+              <span className="mx-2 text-gray-600">·</span>
+              <span className="font-bold text-violet-300">{weekMinutes}</span>
+              <span className="ml-1 text-gray-500">min</span>
+            </div>
+          </div>
+          <WeekBars />
+        </div>
       </Card>
 
-      {/* CEFR journey:五段完成度弧 */}
+      {/* 2 · Level & score:CEFR 弧(主视觉 + 学习路径入口)+ 右栏徽章与本段分数走势 */}
       {levels.length > 0 && (
-        <Card>
-          <h2 className="mb-2 text-sm font-medium text-gray-300">CEFR journey</h2>
-          <CefrArc />
-          <p className="mt-3 text-xs text-gray-500">
-            Intro → A1 → A2 → B1 → B2. B2 is roughly comfortable working English.
+        <Card className="px-6 pt-5 pb-4">
+          <div className="flex flex-wrap items-baseline justify-between gap-3">
+            <h2 className="text-sm font-medium text-gray-300">Level &amp; score</h2>
+            <span className="text-[11px] text-gray-500">CEFR journey · Duolingo score</span>
+          </div>
+          <div className="mt-2.5 grid items-center gap-5 sm:grid-cols-[minmax(0,1fr)_15rem] sm:gap-6">
+            <CefrArc />
+            <div className="flex flex-row flex-wrap items-center justify-center gap-x-7 gap-y-3 border-t border-gray-800 pt-4 sm:flex-col sm:gap-3.5 sm:border-t-0 sm:border-l sm:pt-0 sm:pl-6">
+              <ScoreBadge />
+              <ScoreBandChart />
+            </div>
+          </div>
+          <p className="mt-4 text-xs text-gray-500">
+            Intro → A1 → A2 → B1 → B2. B2 is roughly comfortable working English. Click the level to
+            open the learning path.
           </p>
         </Card>
       )}
 
-      {/* 统计卡 */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <Stat value={latest.totalXp.toLocaleString()} label="total XP" />
-        <Stat
-          value={`${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`}
-          label="time tracked"
-        />
-        <Stat value={`${weekMinutes} min`} label={`last 7 days (${weekXp} XP)`} />
-        <Stat value={`${avgMinutes} min`} label="avg / active day" />
-        <Stat value={String(current.sessionCount ?? '—')} label="lifetime lessons" />
-        <Stat
-          value={bestDay ? `${bestDay.xp}` : '—'}
-          label={bestDay ? `best day (${bestDay.date.slice(5)})` : 'best day'}
-        />
-      </div>
-
-      {/* 每日活动图 */}
+      {/* 3 · Activity:30 天面积图 + 绿墙 + 累计数字 */}
       <Card>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="flex items-baseline gap-2 text-sm font-medium text-gray-300">
-            Daily activity
+            Activity
             <span className="text-xs font-normal text-gray-500">last 30 days</span>
           </h2>
           <span className="flex items-center gap-2 text-xs text-gray-500">
@@ -1040,28 +1074,40 @@ export default function English() {
             Chart appears after a few days 📈
           </p>
         )}
-      </Card>
-
-      {/* 打卡绿墙:日历周对齐,初始锚定最新一周 */}
-      <Card>
-        <h2 className="mb-3 text-sm font-medium text-gray-300">Activity</h2>
-        <ActivityWall />
-        <div className="mt-3 flex items-center gap-2 text-xs text-gray-500">
-          Less
-          <span className="size-3 rounded-sm bg-gray-800" />
-          <span className="size-3 rounded-sm bg-emerald-900" />
-          <span className="size-3 rounded-sm bg-emerald-700" />
-          <span className="size-3 rounded-sm bg-emerald-500" />
-          <span className="size-3 rounded-sm bg-emerald-300" />
-          More
+        <div className="mt-5 grid gap-5 border-t border-gray-800 pt-4 sm:grid-cols-2 sm:gap-7">
+          <div className="min-w-0">
+            <Eyebrow>Every day since {fmtDate(days[0]?.date ?? first.date)}</Eyebrow>
+            <div className="mt-2">
+              <ActivityWall />
+            </div>
+            <div className="mt-2.5 flex items-center gap-1.5 text-[11px] text-gray-500">
+              Less
+              <span className="size-2.5 rounded-sm bg-gray-800" />
+              <span className="size-2.5 rounded-sm bg-emerald-900" />
+              <span className="size-2.5 rounded-sm bg-emerald-700" />
+              <span className="size-2.5 rounded-sm bg-emerald-500" />
+              <span className="size-2.5 rounded-sm bg-emerald-300" />
+              More
+            </div>
+          </div>
+          <div className="grid content-center grid-cols-2 gap-x-4 gap-y-3.5 min-[420px]:grid-cols-3">
+            <Fact value={latest.totalXp.toLocaleString()} label="total XP" />
+            <Fact value={`${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`} label="time tracked" />
+            <Fact value={`${avgMinutes} min`} label="avg / active day" />
+            <Fact value={String(current.sessionCount ?? '—')} label="lifetime lessons" />
+            <Fact
+              value={bestDay ? bestDay.xp.toLocaleString() : '—'}
+              label={bestDay ? `best day · ${bestDay.date.slice(5)}` : 'best day'}
+            />
+            <Fact value={String(current.longestStreak ?? latest.streak)} label="longest streak" />
+          </div>
         </div>
       </Card>
 
       <p className="text-sm text-gray-500">
-        Data source: Duolingo API (updated daily via GitHub Actions). Longest streak{' '}
-        {current.longestStreak ?? latest.streak} · study time as recorded by Duolingo. Score
-        tracked since Aug 16 — earlier moves unrecorded, Aug 16–20 reconstructed from unit
-        progress. Score step dates from lesson timestamps since Aug 29 and from snapshot times
+        Data source: Duolingo API (updated daily via GitHub Actions) · study time as recorded by
+        Duolingo. Score tracked since Aug 16 — earlier moves unrecorded, Aug 16–20 reconstructed from
+        unit progress. Score step dates from lesson timestamps since Aug 29 and from snapshot times
         before. Started Jul 27 via placement test (Intro skipped, score placed in A1); ≈ is the
         estimate for the next score 🦉
       </p>
