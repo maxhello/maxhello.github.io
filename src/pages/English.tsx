@@ -89,9 +89,11 @@ const bestDay = activeDays.reduce<typeof days[number] | null>(
   (best, d) => (!best || d.xp > best.xp ? d : best),
   null,
 )
-const last7 = days.slice(-7)
-const weekMinutes = last7.reduce((s, d) => s + d.minutes, 0)
-const weekXp = last7.reduce((s, d) => s + d.xp, 0)
+/** Pulse 条"近期"窗口:截至昨天的 7 个完整天,不含今天(今天数据不全且已单独展示),合计与迷你柱共用 */
+const RECENT_DAYS = 7
+const recent = days.filter((d) => d.date < todayIso).slice(-RECENT_DAYS)
+const recentMinutes = recent.reduce((s, d) => s + d.minutes, 0)
+const recentXp = recent.reduce((s, d) => s + d.xp, 0)
 const todayDetail = byDate.get(todayIso)
 
 /** 绿墙日历序列:对齐到周一列首,首尾与中间缺口补 0-XP 灰格(采集缺天不再错位整列周几) */
@@ -262,7 +264,7 @@ function useCountUp(target: number, ms = 900): number {
     let raf = 0
     const t0 = performance.now()
     const tick = (t: number) => {
-      const p = Math.min(1, (t - t0) / ms)
+      const p = Math.min(1, Math.max(0, (t - t0) / ms))
       setN(Math.round(target * (1 - Math.pow(1 - p, 3)))) // easeOutCubic
       if (p < 1) raf = requestAnimationFrame(tick)
     }
@@ -278,6 +280,20 @@ function sectionEta(s: { total: number; done: number }): string | null {
   const daysLeft = Math.max(1, Math.round((s.total - s.done) / scoreEta.pace))
   const d = new Date(Date.parse(latest.date) + daysLeft * 86_400_000)
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+/** 窄屏(< sm 640px)判定:SVG 图表按手机宽度换画布尺寸,否则 660 宽的画布缩到 342px 时坐标字只剩 4px */
+function useNarrow(): boolean {
+  const [narrow, setNarrow] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches,
+  )
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 639px)')
+    const on = () => setNarrow(mq.matches)
+    mq.addEventListener('change', on)
+    return () => mq.removeEventListener('change', on)
+  }, [])
+  return narrow
 }
 
 /** 首屏入场:挂载后延迟置 true,配合 CSS transition 做描边生长/淡入;reduced-motion 时由 motion-reduce 类直接呈现 */
@@ -347,7 +363,7 @@ function ScoreBandChart() {
   const dayN = levelSince ? dayDiff(levelSince.date, todayIso) + 1 : null
 
   return (
-    <div className="flex w-full min-w-0 max-w-[240px] flex-col items-center gap-1 justify-self-center">
+    <div className="flex w-full min-w-0 max-w-[340px] flex-col items-center gap-1 justify-self-center sm:max-w-[240px]">
       <svg
         ref={ref}
         viewBox={`0 0 ${W} ${H}`}
@@ -736,9 +752,10 @@ function CefrArc() {
 function DailyChart() {
   const [hover, setHover] = useState<number | null>(null)
   const ref = useRef<SVGSVGElement>(null)
+  const narrow = useNarrow()
   const view = days.slice(-30)
-  const W = 660
-  const H = 190
+  const W = narrow ? 340 : 660
+  const H = narrow ? 160 : 190
   const PAD = 10
   const maxXp = Math.max(50, ...view.map((d) => d.xp))
   const maxMin = Math.max(30, ...view.map((d) => d.minutes))
@@ -874,26 +891,95 @@ function DailyChart() {
   )
 }
 
-/** Pulse 条右侧:最近 7 天每日 XP 的迷你柱,今天高亮,悬停看数值 */
-function WeekBars() {
-  if (last7.length === 0) return null
-  const max = Math.max(1, ...last7.map((d) => d.xp))
+/** Pulse 条右段:近 7 天(不含今天)合计 + 每日 XP 迷你柱,亮色+光晕表示选中/悬停。点/悬停某根柱子,左侧文案切成那一天的明细(日期·XP·分钟·课数),
+ *  再点同一根或移开恢复合计——文案原地替换,布局不跳;手机没有 hover,靠点按切换 */
+function RecentPanel() {
+  const [sel, setSel] = useState<string | null>(null)
+  const [hover, setHover] = useState<string | null>(null)
+  const barsRef = useRef<HTMLDivElement>(null)
+  // 点柱子以外任意位置 / 按 Esc:取消选中,回到 7 天合计
+  useEffect(() => {
+    if (sel === null) return
+    const onDown = (e: PointerEvent) => {
+      if (!barsRef.current?.contains(e.target as Node)) setSel(null)
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSel(null)
+    }
+    document.addEventListener('pointerdown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [sel])
+  if (recent.length === 0) return null
+  const max = Math.max(1, ...recent.map((d) => d.xp))
+  const active = hover ?? sel
+  const day = active ? recent.find((d) => d.date === active) : undefined
+  // 数值两行:XP · min,合计与单日共用
+  const values = (xp: number, minutes: number) => (
+    <div className="mt-1 font-mono text-sm tabular-nums whitespace-nowrap">
+      <span className="font-bold text-cyan-300">{xp.toLocaleString()}</span>
+      <span className="ml-1 text-gray-500">XP</span>
+      <span className="mx-2 text-gray-600">·</span>
+      <span className="font-bold text-violet-300">{minutes}</span>
+      <span className="ml-1 text-gray-500">min</span>
+    </div>
+  )
+  // 单日小标题:"Sep 15 · 24 lessons"(≤ 20 字符,不比合计数值行宽,桌面端整条 Pulse 保持一行)
+  const dayLabel = (d: typeof recent[number]) =>
+    `${fmtDate(d.date)} · ${d.lessons} ${d.lessons === 1 ? 'lesson' : 'lessons'}`
+  // 单日小标题最长的一天(等宽字体,字符数即宽度),预先占位
+  const widest = recent.reduce((w, d) => (dayLabel(d).length > dayLabel(w).length ? d : w), recent[0])
   return (
-    <div className="flex h-9 items-end gap-1" aria-hidden>
-      {last7.map((d) => (
-        <div
-          key={d.date}
-          title={`${d.date}: ${d.xp} XP, ${d.minutes} min`}
-          className={`w-2 rounded-sm ${
-            d.date === todayIso
-              ? 'bg-cyan-300 shadow-[0_0_8px_rgb(103_232_249_/_0.6)]'
-              : d.xp > 0
-                ? 'bg-cyan-400/55'
-                : 'bg-gray-800'
-          }`}
-          style={{ height: `${Math.max(8, (d.xp / max) * 100)}%` }}
-        />
-      ))}
+    <div className="flex w-full items-center gap-4 sm:ml-auto sm:w-auto sm:gap-3.5">
+      {/* 三份文案叠在同一格(合计 / 当前单日 / 最宽单日占位),格宽 = 最宽那份,悬停切换时整条 Pulse 宽度不变、不折行不抖 */}
+      <div className="grid sm:text-right">
+        <div className={`col-start-1 row-start-1 ${day ? 'invisible' : ''}`} aria-hidden={!!day}>
+          <Eyebrow>Last {RECENT_DAYS} days</Eyebrow>
+          {values(recentXp, recentMinutes)}
+        </div>
+        <div className="invisible col-start-1 row-start-1 whitespace-nowrap" aria-hidden>
+          <Eyebrow>{dayLabel(widest)}</Eyebrow>
+          {values(widest.xp, widest.minutes)}
+        </div>
+        {day && (
+          <div className="col-start-1 row-start-1 whitespace-nowrap">
+            <Eyebrow>{dayLabel(day)}</Eyebrow>
+            {values(day.xp, day.minutes)}
+          </div>
+        )}
+      </div>
+      <div className="flex flex-1 justify-center sm:flex-none">
+        <div ref={barsRef} className="flex h-9 items-end gap-1" onMouseLeave={() => setHover(null)}>
+          {recent.map((d) => {
+            const isSel = sel === d.date
+            const isActive = active === d.date
+            const dimmed = active !== null && !isActive
+            return (
+              <button
+                key={d.date}
+                type="button"
+                aria-label={`${d.date}: ${d.xp} XP, ${d.minutes} min, ${d.lessons} lessons`}
+                aria-pressed={isSel}
+                onClick={() => setSel(isSel ? null : d.date)}
+                onMouseEnter={() => setHover(d.date)}
+                onFocus={() => setHover(d.date)}
+                onBlur={() => setHover(null)}
+                className={`w-2.5 cursor-pointer rounded-[2px] transition-[opacity,transform] duration-150 hover:scale-y-105 focus-visible:outline focus-visible:outline-1 focus-visible:outline-cyan-300 motion-reduce:transition-none ${
+                  d.xp <= 0
+                    ? 'bg-gray-800'
+                    : isActive
+                      ? 'bg-cyan-200 shadow-[0_0_10px_rgb(103_232_249_/_0.7)]'
+                      : 'bg-cyan-400/55'
+                } ${dimmed ? 'opacity-50' : ''}`}
+                style={{ height: `${Math.max(8, (d.xp / max) * 100)}%`, transformOrigin: 'bottom' }}
+              />
+            )
+          })}
+        </div>
+      </div>
     </div>
   )
 }
@@ -981,17 +1067,18 @@ export default function English() {
       </div>
 
       {/* 1 · Pulse:streak · 今日 · 近 7 天,一条横条(手机端折行) */}
-      <Card className="flex flex-wrap items-center gap-x-7 gap-y-3.5 px-6 py-4">
-        <div className="flex items-baseline gap-2">
-          <span className="text-5xl font-bold leading-none tracking-tight heading-gradient">{streakN}</span>
-          <span className="text-sm text-gray-400">day streak 🔥</span>
-        </div>
-        <div className="hidden h-10 w-px bg-gray-800 sm:block" />
-        <div>
-          <Eyebrow>Today · {todayIso}</Eyebrow>
+      <Card className="flex flex-wrap items-center gap-x-6 gap-y-3.5 px-5 py-4 sm:px-6">
+        <div className="flex w-full items-center justify-between gap-4 sm:w-auto sm:justify-start sm:gap-6">
+          <div className="flex items-baseline gap-2">
+            <span className="text-4xl font-bold leading-none tracking-tight heading-gradient sm:text-5xl">{streakN}</span>
+            <span className="text-sm text-gray-400 whitespace-nowrap">day streak 🔥</span>
+          </div>
+          <div className="hidden h-10 w-px bg-gray-800 sm:block" />
+          <div className="text-right sm:text-left">
+            <Eyebrow>Today · {todayIso}</Eyebrow>
           {todayDetail ? (
             todayDetail.lessons > 0 ? (
-              <div className="mt-1 flex gap-3.5 text-sm whitespace-nowrap">
+              <div className="mt-1 flex justify-end gap-3.5 text-sm whitespace-nowrap sm:justify-start">
                 <span>
                   <span className="font-bold text-cyan-300">{todayDetail.xp}</span>
                   <span className="ml-1 text-gray-500">XP</span>
@@ -1007,7 +1094,7 @@ export default function English() {
               </div>
             ) : (
               // 有 XP 但 lessons=0:daily 明细还没同步(xpGains 当天滞后),别显示误导性的 0 分钟
-              <div className="mt-1 flex items-baseline gap-4 text-sm">
+              <div className="mt-1 flex flex-wrap items-baseline justify-end gap-x-4 text-sm sm:justify-start">
                 <span>
                   <span className="font-bold text-cyan-300">{todayDetail.xp}</span>
                   <span className="ml-1 text-gray-500">XP</span>
@@ -1018,20 +1105,9 @@ export default function English() {
           ) : (
             <p className="mt-1 text-sm text-gray-500">No lessons yet today 🦉</p>
           )}
-        </div>
-        <div className="flex w-full items-center justify-between gap-3.5 sm:ml-auto sm:w-auto sm:justify-start">
-          <div className="sm:text-right">
-            <Eyebrow>Last 7 days</Eyebrow>
-            <div className="mt-1 font-mono text-sm tabular-nums whitespace-nowrap">
-              <span className="font-bold text-cyan-300">{weekXp.toLocaleString()}</span>
-              <span className="ml-1 text-gray-500">XP</span>
-              <span className="mx-2 text-gray-600">·</span>
-              <span className="font-bold text-violet-300">{weekMinutes}</span>
-              <span className="ml-1 text-gray-500">min</span>
-            </div>
           </div>
-          <WeekBars />
         </div>
+        <RecentPanel />
       </Card>
 
       {/* 2 · Level & score:CEFR 弧(主视觉 + 学习路径入口)+ 右栏徽章与本段分数走势 */}
@@ -1075,7 +1151,7 @@ export default function English() {
           </p>
         )}
         <div className="mt-5 grid gap-5 border-t border-gray-800 pt-4 sm:grid-cols-2 sm:gap-7">
-          <div className="min-w-0">
+          <div className="min-w-0 sm:mx-auto sm:w-fit sm:max-w-full">
             <Eyebrow>Every day since {fmtDate(days[0]?.date ?? first.date)}</Eyebrow>
             <div className="mt-2">
               <ActivityWall />
@@ -1090,7 +1166,7 @@ export default function English() {
               More
             </div>
           </div>
-          <div className="grid content-center grid-cols-2 gap-x-4 gap-y-3.5 min-[420px]:grid-cols-3">
+          <div className="grid content-center justify-center grid-cols-2 gap-x-4 gap-y-3.5 min-[420px]:grid-cols-3 sm:grid-cols-[repeat(3,auto)] sm:gap-x-9">
             <Fact value={latest.totalXp.toLocaleString()} label="total XP" />
             <Fact value={`${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`} label="time tracked" />
             <Fact value={`${avgMinutes} min`} label="avg / active day" />
