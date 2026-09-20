@@ -6,7 +6,7 @@
   },
   "current": {
     "longestStreak": 56,
-    "sessionCount": 1007,
+    "sessionCount": 1026,
     "sections": [
       {
         "cefr": "Intro",
@@ -18,7 +18,7 @@
       {
         "cefr": "A1",
         "unitsTotal": 30,
-        "unitsCompleted": 25,
+        "unitsCompleted": 26,
         "scoreMin": 10,
         "scoreMax": 19
       },
@@ -475,15 +475,15 @@
     },
     {
       "date": "2026-09-20",
-      "totalXp": 47007,
+      "totalXp": 47678,
       "streak": 56,
       "score": {
         "reached": 18,
-        "lastUnitDone": 34,
+        "lastUnitDone": 35,
         "bandStart": 34,
         "nextAtUnit": 36
       },
-      "apiCoverage": "2026-08-06~2026-09-20(46d)"
+      "apiCoverage": "2026-08-07~2026-09-20(45d)"
     }
   ],
   "daily": {
@@ -763,9 +763,9 @@
       "xp": 305
     },
     "2026-09-20": {
-      "lessons": 22,
-      "minutes": 80,
-      "xp": 922
+      "lessons": 41,
+      "minutes": 133,
+      "xp": 1618
     }
   },
   "unitDone": {
@@ -778,7 +778,8 @@
     "30": "2026-09-08",
     "31": "2026-09-10",
     "32": "2026-09-13",
-    "34": "2026-09-17"
+    "34": "2026-09-17",
+    "35": "2026-09-20"
   },
   "scoreReached": {
     "12": "2026-08-17",
