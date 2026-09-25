@@ -6,7 +6,7 @@
   },
   "current": {
     "longestStreak": 61,
-    "sessionCount": 1098,
+    "sessionCount": 1114,
     "sections": [
       {
         "cefr": "Intro",
@@ -535,7 +535,7 @@
     },
     {
       "date": "2026-09-25",
-      "totalXp": 52568,
+      "totalXp": 53320,
       "streak": 61,
       "score": {
         "reached": 19,
@@ -543,7 +543,7 @@
         "bandStart": 37,
         "nextAtUnit": 39
       },
-      "apiCoverage": "2026-08-11~2026-09-25(46d)"
+      "apiCoverage": "2026-08-12~2026-09-25(45d)"
     }
   ],
   "daily": {
@@ -848,9 +848,9 @@
       "xp": 1023
     },
     "2026-09-25": {
-      "lessons": 2,
-      "minutes": 11,
-      "xp": 193
+      "lessons": 18,
+      "minutes": 66,
+      "xp": 946
     }
   },
   "unitDone": {
