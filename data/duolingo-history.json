@@ -5,8 +5,8 @@
     "learningLanguage": "en"
   },
   "current": {
-    "longestStreak": 65,
-    "sessionCount": 1185,
+    "longestStreak": 66,
+    "sessionCount": 1188,
     "sections": [
       {
         "cefr": "Intro",
@@ -592,6 +592,18 @@
         "nextAtUnit": 42
       },
       "apiCoverage": "2026-08-16~2026-09-29(45d)"
+    },
+    {
+      "date": "2026-09-30",
+      "totalXp": 57711,
+      "streak": 66,
+      "score": {
+        "reached": 20,
+        "lastUnitDone": 39,
+        "bandStart": 40,
+        "nextAtUnit": 42
+      },
+      "apiCoverage": "2026-08-16~2026-09-30(46d)"
     }
   ],
   "daily": {
@@ -919,6 +931,11 @@
       "lessons": 18,
       "minutes": 70,
       "xp": 975
+    },
+    "2026-09-30": {
+      "lessons": 3,
+      "minutes": 13,
+      "xp": 378
     }
   },
   "unitDone": {
