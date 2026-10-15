@@ -16,6 +16,11 @@ export const site = {
   siteRepo: 'maxhello.github.io',
   /** 固定展示的仓库名(Projects 页置顶) */
   pinnedRepos: ['lp-lab', 'maxhello.github.io'],
+  /** AI 口语陪练(独立项目 livekit-tutor):页面地址 + 后端 API(学习路径页读练习次数) */
+  tutor: {
+    url: 'https://maxhello.github.io/livekit-tutor/',
+    api: 'https://tutor.161-118-222-205.sslip.io',
+  },
   /** giscus 评论配置(giscus.app 生成,repo 改名后 ID 不变) */
   giscus: {
     repoId: 'R_kgDORrItCQ',

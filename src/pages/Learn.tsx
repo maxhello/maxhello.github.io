@@ -4,6 +4,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import history from '../../data/duolingo-history.json'
 import { UnitGuideBody, unitLabel, useGuidebooks, type GuideUnit } from '../components/UnitGuide'
 import { usePageTitle } from '../hooks/usePageTitle'
+import { tutorHistoryUrl, tutorPracticeUrl, useTutorStats } from '../lib/tutor'
 
 /**
  * 学习路径页(/english/learn):参考多邻国 learn 页的结构——顶部当前阶段横幅 + 蛇形单元节点路径,
@@ -11,6 +12,7 @@ import { usePageTitle } from '../hooks/usePageTitle'
  * 进页面直接定位到正在学的节点:在数据到达后的那次渲染 useLayoutEffect 里瞬时(behavior instant)定位,
  * 首帧画出来就已经在位,不会看到页面往下滑(全站 html 有 scroll-behavior: smooth,必须显式 instant)。
  * 进度来自每日快照(score.lastUnitDone),指南内容来自 data/duolingo-guidebooks.json。
+ * 打通 AI 口语陪练(lib/tutor.ts):已学/当前单元可一键「和 Emma 练」,节点标练过几次。
  * 只借鉴布局与交互,不用多邻国的商标、配色与素材。
  */
 interface HistoryLite {
@@ -38,6 +40,7 @@ function Node({
   onOpen,
   refCb,
   pos,
+  practiced,
 }: {
   u: GuideUnit
   status: Status
@@ -45,6 +48,8 @@ function Node({
   onOpen: () => void
   refCb?: (el: HTMLDivElement | null) => void
   pos: number
+  /** 和 Emma 练过几次(没登录陪练时不传) */
+  practiced?: number
 }) {
   const offset = WAVE[pos % WAVE.length]
   const icon = status === 'done' ? '✓' : status === 'current' ? '★' : '🔒'
@@ -76,6 +81,11 @@ function Node({
             语法 · {u.grammar.map((g) => g.title).filter(Boolean).join(' / ') || '有'}
           </div>
         )}
+        {!!practiced && (
+          <div className="mt-0.5 text-[10px] font-medium tracking-wide text-cyan-300/80">
+            和 Emma 练过 {practiced} 次
+          </div>
+        )}
       </div>
     </div>
   )
@@ -92,6 +102,7 @@ export default function Learn() {
   })
   const currentRef = useRef<HTMLDivElement | null>(null)
   const positioned = useRef(false)
+  const practiced = useTutorStats()
 
   const bySection = useMemo(() => {
     const m = new Map<number, GuideUnit[]>()
@@ -143,9 +154,14 @@ export default function Learn() {
             </div>
             <div className="mt-1 truncate text-xl font-bold text-white">{current.objective}</div>
           </div>
-          <button type="button" onClick={() => setOpenIdx(current.unitIndex)} className="btn-chunky">
-            指南
-          </button>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setOpenIdx(current.unitIndex)} className="btn-chunky">
+              指南
+            </button>
+            <a href={tutorPracticeUrl(current.unitIndex)} className="btn-chunky">
+              和 Emma 练
+            </a>
+          </div>
         </div>
       )}
 
@@ -176,6 +192,7 @@ export default function Learn() {
                         status={st}
                         active={openIdx === u.unitIndex}
                         onOpen={() => setOpenIdx(u.unitIndex)}
+                        practiced={practiced?.[u.unitIndex]}
                         refCb={st === 'current' ? (el) => (currentRef.current = el) : undefined}
                       />
                     )
@@ -214,6 +231,18 @@ export default function Learn() {
                 ×
               </button>
             </div>
+            {statusOf(openUnit.unitIndex) !== 'locked' && (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <a href={tutorPracticeUrl(openUnit.unitIndex)} className="btn-primary text-sm">
+                  和 Emma 练这一单元
+                </a>
+                {!!practiced?.[openUnit.unitIndex] && (
+                  <a href={tutorHistoryUrl(openUnit.unitIndex)} className="btn-ghost text-sm">
+                    练习记录 · {practiced[openUnit.unitIndex]} 次
+                  </a>
+                )}
+              </div>
+            )}
             <div className="mt-4 flex-1 overflow-y-auto pb-6">
               <UnitGuideBody unit={openUnit} ttsBase={data.ttsBase} />
             </div>
