@@ -856,6 +856,18 @@
         "nextAtUnit": 48
       },
       "apiCoverage": "2026-09-07~2026-10-21(45d)"
+    },
+    {
+      "date": "2026-10-22",
+      "totalXp": 76332,
+      "streak": 87,
+      "score": {
+        "reached": 22,
+        "lastUnitDone": 46,
+        "bandStart": 46,
+        "nextAtUnit": 48
+      },
+      "apiCoverage": "2026-09-07~2026-10-21(45d)"
     }
   ],
   "daily": {
