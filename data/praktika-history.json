@@ -1,0 +1,187 @@
+{
+  "meta": {
+    "since": "2026-11-11"
+  },
+  "current": {
+    "streak": 1,
+    "streakEnd": "2026-11-11",
+    "longestStreak": 1,
+    "level": "A0_1",
+    "dailyGoal": 15,
+    "plan": [
+      {
+        "name": "基础介绍",
+        "units": [
+          {
+            "name": "基础词汇",
+            "lessons": 4,
+            "state": "done"
+          },
+          {
+            "name": "be动词",
+            "lessons": 3,
+            "state": "doing"
+          },
+          {
+            "name": "自我介绍",
+            "lessons": 4,
+            "state": "todo"
+          },
+          {
+            "name": "介绍他人",
+            "lessons": 4,
+            "state": "todo"
+          },
+          {
+            "name": "简单介绍",
+            "lessons": 3,
+            "state": "todo"
+          },
+          {
+            "name": "复习提升",
+            "lessons": 3,
+            "state": "todo"
+          }
+        ]
+      },
+      {
+        "name": "表达喜好",
+        "units": [
+          {
+            "name": "单词探险",
+            "lessons": 4,
+            "state": "todo"
+          },
+          {
+            "name": "语法解锁",
+            "lessons": 3,
+            "state": "todo"
+          },
+          {
+            "name": "阅读解码",
+            "lessons": 4,
+            "state": "todo"
+          },
+          {
+            "name": "听力捕捉",
+            "lessons": 4,
+            "state": "todo"
+          },
+          {
+            "name": "口语交流",
+            "lessons": 3,
+            "state": "todo"
+          },
+          {
+            "name": "复习提升",
+            "lessons": 3,
+            "state": "todo"
+          }
+        ]
+      }
+    ]
+  },
+  "daily": {
+    "2026-11-11": {
+      "lessons": 5,
+      "minutes": 42,
+      "aborted": 3
+    }
+  },
+  "sessions": [
+    {
+      "id": "6485cc42-95d6-4e4b-8121-2750d1de9c05",
+      "date": "2026-11-11",
+      "start": "22:24",
+      "seconds": 466,
+      "caption": "基础句型",
+      "lessonId": "2511b3b4-628f-42fc-871d-21c8c31a18c8"
+    },
+    {
+      "id": "9db9b76d-ab32-4472-9a4e-06ff5cb9f7a1",
+      "date": "2026-11-11",
+      "start": "22:12",
+      "seconds": 462,
+      "caption": "数字",
+      "lessonId": "b858323d-ae96-4909-b095-2d2b06eefcd7"
+    },
+    {
+      "id": "fc022ce7-2939-48fc-bd22-5d9900225976",
+      "date": "2026-11-11",
+      "start": "22:01",
+      "seconds": 594,
+      "caption": "必学单词",
+      "lessonId": "b59dd0e4-c7fe-4ab2-9651-2a09244fd896"
+    },
+    {
+      "id": "e342773c-321d-4467-9b1b-999e4a4f5309",
+      "date": "2026-11-11",
+      "start": "21:53",
+      "seconds": 376,
+      "caption": "打招呼",
+      "lessonId": "89bedf88-ccd5-4c89-841c-96429b12fbd9"
+    },
+    {
+      "id": "41bfc9ce-882e-49a1-a781-4c906f8c1700",
+      "date": "2026-11-11",
+      "start": "21:42",
+      "seconds": 594,
+      "caption": "语音探险",
+      "lessonId": "14353f6b-a8fa-4d21-a5a9-48d3f52b5a97"
+    }
+  ],
+  "words": {
+    "Goodbye": {
+      "zh": "再见",
+      "date": "2026-11-11"
+    },
+    "Hello": {
+      "zh": "你好",
+      "date": "2026-11-11"
+    },
+    "How are you?": {
+      "zh": "你好吗？",
+      "date": "2026-11-11"
+    },
+    "I": {
+      "zh": "我",
+      "date": "2026-11-11"
+    },
+    "I'm fine": {
+      "zh": "我很好",
+      "date": "2026-11-11"
+    },
+    "Please": {
+      "zh": "请",
+      "date": "2026-11-11"
+    },
+    "Thank you": {
+      "zh": "谢谢",
+      "date": "2026-11-11"
+    },
+    "Yes": {
+      "zh": "是的",
+      "date": "2026-11-11"
+    },
+    "he": {
+      "zh": "他",
+      "date": "2026-11-11"
+    },
+    "it": {
+      "zh": "它；这",
+      "date": "2026-11-11"
+    },
+    "she": {
+      "zh": "她",
+      "date": "2026-11-11"
+    },
+    "we": {
+      "zh": "我们",
+      "date": "2026-11-11"
+    },
+    "you": {
+      "zh": "你；你们",
+      "date": "2026-11-11"
+    }
+  }
+}

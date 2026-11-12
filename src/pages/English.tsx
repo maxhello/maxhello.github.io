@@ -3,6 +3,17 @@ import history from '../../data/duolingo-history.json'
 import { Link } from 'react-router-dom'
 import { Card, SectionTitle, SectionSubtitle } from '../components/ui'
 import { usePageTitle } from '../hooks/usePageTitle'
+import SpeakingPractice from '../components/SpeakingPractice'
+import {
+  fmtDuration,
+  hasSpeaking,
+  praktika,
+  speakingDaily,
+  speakingDays,
+  speakingLessons,
+  speakingMinutes,
+  speakingMinutesOn,
+} from '../lib/praktika'
 
 interface DayDetail {
   lessons: number
@@ -83,8 +94,10 @@ const byDate = new Map(days.map((d) => [d.date, d]))
 
 const activeDays = days.filter((d) => d.xp > 0)
 const daysWithMinutes = days.filter((d) => d.minutes > 0)
-const totalMinutes = daysWithMinutes.reduce((s, d) => s + d.minutes, 0)
-const avgMinutes = daysWithMinutes.length ? Math.round(totalMinutes / daysWithMinutes.length) : 0
+/** 总时长 = 多邻国 + Praktika 口语;"有学习的天"取两边并集 */
+const totalMinutes = daysWithMinutes.reduce((s, d) => s + d.minutes, 0) + speakingMinutes
+const minuteDates = new Set([...daysWithMinutes, ...speakingDays].map((d) => d.date))
+const avgMinutes = minuteDates.size ? Math.round(totalMinutes / minuteDates.size) : 0
 const bestDay = activeDays.reduce<typeof days[number] | null>(
   (best, d) => (!best || d.xp > best.xp ? d : best),
   null,
@@ -94,7 +107,9 @@ const RECENT_DAYS = 7
 const recent = days.filter((d) => d.date < todayIso).slice(-RECENT_DAYS)
 const recentMinutes = recent.reduce((s, d) => s + d.minutes, 0)
 const recentXp = recent.reduce((s, d) => s + d.xp, 0)
+const recentSpeaking = recent.reduce((s, d) => s + speakingMinutesOn(d.date), 0)
 const todayDetail = byDate.get(todayIso)
+const todaySpeaking = speakingDaily[todayIso]
 
 /** 绿墙日历序列:对齐到周一列首,首尾与中间缺口补 0-XP 灰格(采集缺天不再错位整列周几) */
 const wallDays = (() => {
@@ -749,28 +764,28 @@ function CefrArc() {
 }
 
 /** 渐变面积图:最近 30 天,XP 面积 + 时长折线,悬停十字线 */
+/** 30 天图:每天一根柱 = 学习分钟数(多邻国青在下、Praktika 口语紫叠在上),
+ *  多邻国 XP 用虚线另走一条刻度(XP 是多邻国独有的量,不和分钟混成一根) */
 function DailyChart() {
   const [hover, setHover] = useState<number | null>(null)
   const ref = useRef<SVGSVGElement>(null)
   const narrow = useNarrow()
-  const view = days.slice(-30)
+  const view = days.slice(-30).map((d) => ({ ...d, speak: speakingMinutesOn(d.date) }))
   const W = narrow ? 340 : 660
   const H = narrow ? 160 : 190
   const PAD = 10
+  const TOP = 16 // 悬停数据卡不透明,直接盖在图上(同原面积图)
   const maxXp = Math.max(50, ...view.map((d) => d.xp))
-  const maxMin = Math.max(30, ...view.map((d) => d.minutes))
+  const maxMin = Math.max(30, ...view.map((d) => d.minutes + d.speak))
   const bw = W / view.length
+  const barW = Math.max(3, bw * 0.62)
   const px = (i: number) => i * bw + bw / 2
   // X 轴标签密度:每个标签约占 46px 宽,按天数抽稀
   const xLabelEvery = Math.max(1, Math.ceil(view.length / (W / 46)))
-  const pyXp = (v: number) => H - PAD - (v / maxXp) * (H - PAD * 2)
-  const pyMin = (v: number) => H - PAD - (v / maxMin) * (H - PAD * 2)
-
-  const areaPath =
-    `M ${px(0)},${pyXp(view[0].xp)} ` +
-    view.map((d, i) => `L ${px(i)},${pyXp(d.xp)}`).join(' ') +
-    ` L ${px(view.length - 1)},${H - PAD} L ${px(0)},${H - PAD} Z`
-  const linePath = view.map((d, i) => `${px(i)},${pyMin(d.minutes)}`).join(' L ')
+  const base = H - PAD
+  const pyXp = (v: number) => base - (v / maxXp) * (base - TOP)
+  const pyMin = (v: number) => base - (v / maxMin) * (base - TOP)
+  const xpLine = view.map((d, i) => `${px(i)},${pyXp(d.xp)}`).join(' L ')
   const hoverD = hover !== null ? view[hover] : null
 
   /** 指针/手指横坐标 → 天索引,越界置空(鼠标与触屏共用) */
@@ -788,100 +803,75 @@ function DailyChart() {
       viewBox={`0 0 ${W} ${H}`}
       className="w-full"
       role="img"
-      aria-label="Daily XP and minutes"
+      aria-label="Daily study minutes by app, with Duolingo XP"
       style={{ touchAction: 'pan-y' }}
       onMouseLeave={() => setHover(null)}
       onMouseMove={(e) => locate(e.clientX)}
       onTouchStart={(e) => locate(e.touches[0].clientX)}
       onTouchMove={(e) => locate(e.touches[0].clientX)}
     >
-      <defs>
-        <linearGradient id="xpArea" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#22d3ee" stopOpacity="0.35" />
-          <stop offset="100%" stopColor="#22d3ee" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      {/* XP 面积 + 顶线 */}
-      <path d={areaPath} fill="url(#xpArea)" />
-      <path
-        d={`M ${view.map((d, i) => `${px(i)},${pyXp(d.xp)}`).join(' L ')}`}
-        fill="none"
-        stroke="#22d3ee"
-        strokeWidth="2"
-        strokeLinejoin="round"
-      />
-      {/* 分钟折线 */}
-      <path
-        d={`M ${linePath}`}
-        fill="none"
-        stroke="#a78bfa"
-        strokeWidth="1.5"
-        strokeDasharray="5 4"
-      />
+      {/* 分钟柱:多邻国在下,口语叠上 */}
+      {view.map((d, i) => {
+        const dim = hover !== null && hover !== i
+        const x = px(i) - barW / 2
+        return (
+          <g key={`b-${d.date}`} opacity={dim ? 0.45 : 1}>
+            <rect x={x} y={pyMin(d.minutes)} width={barW} height={base - pyMin(d.minutes)} rx={1.5} className="fill-cyan-400/70" />
+            {d.speak > 0 && (
+              <rect
+                x={x}
+                y={pyMin(d.minutes + d.speak)}
+                width={barW}
+                height={pyMin(d.minutes) - pyMin(d.minutes + d.speak)}
+                rx={1.5}
+                className="fill-violet-400"
+              />
+            )}
+          </g>
+        )
+      })}
+      {/* 多邻国 XP 虚线 */}
+      <path d={`M ${xpLine}`} fill="none" className="stroke-gray-300" strokeWidth="1.5" strokeDasharray="2 3" strokeLinejoin="round" />
       {/* 悬停十字线 + 浮动数据卡 */}
       {hoverD && (
         <g>
-          <line
-            x1={px(hover!)}
-            y1={PAD}
-            x2={px(hover!)}
-            y2={H - PAD}
-            stroke="#67e8f9"
-            strokeWidth="1"
-            strokeOpacity="0.5"
-          />
-          <circle cx={px(hover!)} cy={pyXp(hoverD.xp)} r="4" fill="#22d3ee" />
-          <circle cx={px(hover!)} cy={pyMin(hoverD.minutes)} r="3.5" fill="#a78bfa" />
+          <line x1={px(hover!)} y1={TOP - 4} x2={px(hover!)} y2={base} stroke="#67e8f9" strokeWidth="1" strokeOpacity="0.5" />
+          <circle cx={px(hover!)} cy={pyXp(hoverD.xp)} r="3.5" className="fill-gray-200" />
           {/* 浮动卡:靠边翻转,避免出界 */}
           {(() => {
             const cx = px(hover!)
-            const bw2 = 62
+            const bw2 = 76
             const bx = Math.min(Math.max(cx - bw2 / 2, 2), W - bw2 - 2)
+            const rowsN = hoverD.speak > 0 ? 3 : 2
             return (
               <g>
-                <rect
-                  x={bx}
-                  y={6}
-                  width={bw2}
-                  height={54}
-                  rx={5}
-                  fill="#0b1220"
-                  stroke="rgb(55 65 81)"
-                />
-                <text x={bx + bw2 / 2} y={22} textAnchor="middle" fontSize="10" fill="#9ca3af">
+                <rect x={bx} y={2} width={bw2} height={22 + rowsN * 13} rx={5} fill="#0b1220" stroke="rgb(55 65 81)" />
+                <text x={bx + bw2 / 2} y={15} textAnchor="middle" fontSize="10" fill="#9ca3af">
                   {hoverD.date.slice(5)}
                 </text>
-                <text x={bx + 10} y={38} fontSize="10" fill="#22d3ee">
+                <text x={bx + 8} y={29} fontSize="10" className="fill-gray-200">
                   {hoverD.xp} XP
                 </text>
-                <text x={bx + 10} y={52} fontSize="10" fill="#a78bfa">
+                <text x={bx + 8} y={42} fontSize="10" fill="#22d3ee">
                   {hoverD.minutes}m · {hoverD.lessons}课
                 </text>
+                {hoverD.speak > 0 && (
+                  <text x={bx + 8} y={55} fontSize="10" fill="#a78bfa">
+                    {hoverD.speak}m speaking
+                  </text>
+                )}
               </g>
             )
           })()}
         </g>
       )}
-      <line x1={0} y1={H - PAD} x2={W} y2={H - PAD} className="stroke-gray-700" strokeWidth="1" />
+      <line x1={0} y1={base} x2={W} y2={base} className="stroke-gray-700" strokeWidth="1" />
       {/* X 轴日期:隔 N 天标一个,每天画小刻度 */}
       {view.map((d, i) => (
         <g key={`x-${d.date}`}>
-          <line
-            x1={px(i)}
-            y1={H - PAD}
-            x2={px(i)}
-            y2={H - PAD + 3}
-            className="stroke-gray-600"
-            strokeWidth="1"
-          />
+          <line x1={px(i)} y1={base} x2={px(i)} y2={base + 3} className="stroke-gray-600" strokeWidth="1" />
           {i % xLabelEvery === 0 && (
-            <text
-              x={px(i)}
-              y={H - 2}
-              textAnchor="middle"
-              fontSize="9"
-              className="fill-gray-500"
-            >
+            <text x={px(i)} y={H - 2} textAnchor="middle" fontSize="9" className="fill-gray-500">
               {d.date.slice(5)}
             </text>
           )}
@@ -914,40 +904,50 @@ function RecentPanel() {
     }
   }, [sel])
   if (recent.length === 0) return null
-  const max = Math.max(1, ...recent.map((d) => d.xp))
+  // 柱高 = 当天总分钟(多邻国青 + 口语紫叠放)
+  const max = Math.max(1, ...recent.map((d) => d.minutes + speakingMinutesOn(d.date)))
   const active = hover ?? sel
   const day = active ? recent.find((d) => d.date === active) : undefined
-  // 数值两行:XP · min,合计与单日共用
-  const values = (xp: number, minutes: number) => (
+  // 数值行:XP · min(多邻国)· 口语 min(有才显示),合计与单日共用
+  const values = (xp: number, minutes: number, speak: number) => (
     <div className="mt-1 font-mono text-sm tabular-nums whitespace-nowrap">
       <span className="font-bold text-cyan-300">{xp.toLocaleString()}</span>
       <span className="ml-1 text-gray-500">XP</span>
       <span className="mx-2 text-gray-600">·</span>
-      <span className="font-bold text-violet-300">{minutes}</span>
+      <span className="font-bold text-gray-200">{minutes}</span>
       <span className="ml-1 text-gray-500">min</span>
+      {/* 口语另起一行:同一行会撑宽右段,桌面端 Pulse 折成两行、手机端把迷你柱挤出屏幕 */}
+      {speak > 0 && (
+        <span className="block">
+          <span className="font-bold text-violet-300">{speak}</span>
+          <span className="ml-1 text-gray-500">min speaking</span>
+        </span>
+      )}
     </div>
   )
   // 单日小标题:"Sep 15 · 24 lessons"(≤ 20 字符,不比合计数值行宽,桌面端整条 Pulse 保持一行)
   const dayLabel = (d: typeof recent[number]) =>
     `${fmtDate(d.date)} · ${d.lessons} ${d.lessons === 1 ? 'lesson' : 'lessons'}`
-  // 单日小标题最长的一天(等宽字体,字符数即宽度),预先占位
-  const widest = recent.reduce((w, d) => (dayLabel(d).length > dayLabel(w).length ? d : w), recent[0])
+  // 单日文案最宽的一天(等宽字体,字符数即宽度),预先占位;口语在第二行,单独比宽
+  const width = (d: typeof recent[number]) =>
+    Math.max(dayLabel(d).length, `${d.xp}XP·${d.minutes}min`.length, speakingMinutesOn(d.date) ? 15 : 0)
+  const widest = recent.reduce((w, d) => (width(d) > width(w) ? d : w), recent[0])
   return (
     <div className="flex w-full items-center gap-4 sm:ml-auto sm:w-auto sm:gap-3.5">
       {/* 三份文案叠在同一格(合计 / 当前单日 / 最宽单日占位),格宽 = 最宽那份,悬停切换时整条 Pulse 宽度不变、不折行不抖 */}
       <div className="grid sm:text-right">
         <div className={`col-start-1 row-start-1 ${day ? 'invisible' : ''}`} aria-hidden={!!day}>
           <Eyebrow>Last {RECENT_DAYS} days</Eyebrow>
-          {values(recentXp, recentMinutes)}
+          {values(recentXp, recentMinutes, recentSpeaking)}
         </div>
         <div className="invisible col-start-1 row-start-1 whitespace-nowrap" aria-hidden>
           <Eyebrow>{dayLabel(widest)}</Eyebrow>
-          {values(widest.xp, widest.minutes)}
+          {values(widest.xp, widest.minutes, speakingMinutesOn(widest.date))}
         </div>
         {day && (
           <div className="col-start-1 row-start-1 whitespace-nowrap">
             <Eyebrow>{dayLabel(day)}</Eyebrow>
-            {values(day.xp, day.minutes)}
+            {values(day.xp, day.minutes, speakingMinutesOn(day.date))}
           </div>
         )}
       </div>
@@ -957,25 +957,33 @@ function RecentPanel() {
             const isSel = sel === d.date
             const isActive = active === d.date
             const dimmed = active !== null && !isActive
+            const speak = speakingMinutesOn(d.date)
+            const total = d.minutes + speak
             return (
               <button
                 key={d.date}
                 type="button"
-                aria-label={`${d.date}: ${d.xp} XP, ${d.minutes} min, ${d.lessons} lessons`}
+                aria-label={`${d.date}: ${d.xp} XP, ${d.minutes} min, ${d.lessons} lessons${speak ? `, ${speak} min speaking` : ''}`}
                 aria-pressed={isSel}
                 onClick={() => setSel(isSel ? null : d.date)}
                 onMouseEnter={() => setHover(d.date)}
                 onFocus={() => setHover(d.date)}
                 onBlur={() => setHover(null)}
-                className={`w-2.5 cursor-pointer rounded-[2px] transition-[opacity,transform] duration-150 hover:scale-y-105 focus-visible:outline focus-visible:outline-1 focus-visible:outline-cyan-300 motion-reduce:transition-none ${
-                  d.xp <= 0
-                    ? 'bg-gray-800'
-                    : isActive
-                      ? 'bg-cyan-200 shadow-[0_0_10px_rgb(103_232_249_/_0.7)]'
-                      : 'bg-cyan-400/55'
+                className={`flex w-2.5 cursor-pointer flex-col overflow-hidden rounded-[2px] transition-[opacity,transform] duration-150 hover:scale-y-105 focus-visible:outline focus-visible:outline-1 focus-visible:outline-cyan-300 motion-reduce:transition-none ${
+                  isActive && total > 0 ? 'shadow-[0_0_10px_rgb(103_232_249_/_0.7)]' : ''
                 } ${dimmed ? 'opacity-50' : ''}`}
-                style={{ height: `${Math.max(8, (d.xp / max) * 100)}%`, transformOrigin: 'bottom' }}
-              />
+                style={{ height: `${Math.max(8, (total / max) * 100)}%`, transformOrigin: 'bottom' }}
+              >
+                {speak > 0 && (
+                  <span
+                    className={isActive ? 'bg-violet-200' : 'bg-violet-400/70'}
+                    style={{ height: `${(speak / total) * 100}%` }}
+                  />
+                )}
+                <span
+                  className={`flex-1 ${total <= 0 ? 'bg-gray-800' : isActive ? 'bg-cyan-200' : 'bg-cyan-400/55'}`}
+                />
+              </button>
             )
           })}
         </div>
@@ -1018,23 +1026,30 @@ function ActivityWall() {
         {Array.from({ length: Math.ceil(wallDays.length / 7) }, (_, w) => (
           <div key={w} className="flex flex-col gap-1">
             {wallDays.slice(w * 7, w * 7 + 7).map((d) => {
+              // 按当天总学习分钟上色(多邻国 + 口语);有口语练习的天加紫色内框
+              const speak = speakingMinutesOn(d.date)
+              const m = d.minutes + speak
               const lvl =
-                d.xp <= 0
+                m <= 0
                   ? 'bg-gray-800'
-                  : d.xp < 200
+                  : m < 30
                     ? 'bg-emerald-900'
-                    : d.xp < 500
+                    : m < 60
                       ? 'bg-emerald-700'
-                      : d.xp < 800
+                      : m < 90
                         ? 'bg-emerald-500'
                         : 'bg-emerald-300'
+              const mark =
+                d.date === todayIso
+                  ? 'animate-pulse ring-1 ring-cyan-300'
+                  : speak > 0
+                    ? 'ring-2 ring-inset ring-violet-400'
+                    : ''
               return (
                 <div
                   key={d.date}
-                  title={`${d.date}: ${d.xp} XP, ${d.minutes} min`}
-                  className={`size-3.5 rounded-sm transition-transform hover:scale-150 ${lvl} ${
-                    d.date === todayIso ? 'animate-pulse ring-1 ring-cyan-300' : ''
-                  }`}
+                  title={`${d.date}: ${m} min (${d.xp} XP${speak ? `, ${speak} min speaking` : ''})`}
+                  className={`size-3.5 rounded-sm transition-transform hover:scale-150 ${lvl} ${mark}`}
                 />
               )
             })}
@@ -1062,16 +1077,24 @@ export default function English() {
       <div>
         <SectionTitle>English Learning</SectionTitle>
         <SectionSubtitle>
-          Daily Duolingo snapshots — auto-updated. Tracked since {days[0]?.date ?? first.date}.
+          {hasSpeaking ? 'Duolingo for vocab & reading · Praktika for speaking' : 'Daily Duolingo snapshots'} —
+          auto-updated. Tracked since {days[0]?.date ?? first.date}.
         </SectionSubtitle>
       </div>
 
       {/* 1 · Pulse:streak · 今日 · 近 7 天,一条横条(手机端折行) */}
       <Card className="flex flex-wrap items-center gap-x-6 gap-y-3.5 px-5 py-4 sm:px-6">
         <div className="flex w-full items-center justify-between gap-4 sm:w-auto sm:justify-start sm:gap-6">
-          <div className="flex items-baseline gap-2">
-            <span className="text-4xl font-bold leading-none tracking-tight heading-gradient sm:text-5xl">{streakN}</span>
-            <span className="text-sm text-gray-400 whitespace-nowrap">day streak 🔥</span>
+          <div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-4xl font-bold leading-none tracking-tight heading-gradient sm:text-5xl">{streakN}</span>
+              <span className="text-sm text-gray-400 whitespace-nowrap">day streak 🔥</span>
+            </div>
+            {hasSpeaking && (praktika.current.streak ?? 0) > 0 && (
+              <div className="mt-1.5 text-[11px] whitespace-nowrap text-gray-500">
+                Duolingo · <span className="text-violet-300">Praktika {praktika.current.streak} {praktika.current.streak === 1 ? 'day' : 'days'}</span>
+              </div>
+            )}
           </div>
           <div className="hidden h-10 w-px bg-gray-800 sm:block" />
           <div className="text-right sm:text-left">
@@ -1084,7 +1107,7 @@ export default function English() {
                   <span className="ml-1 text-gray-500">XP</span>
                 </span>
                 <span>
-                  <span className="font-bold text-violet-300">{todayDetail.minutes}</span>
+                  <span className="font-bold text-gray-200">{todayDetail.minutes}</span>
                   <span className="ml-1 text-gray-500">min</span>
                 </span>
                 <span>
@@ -1105,6 +1128,18 @@ export default function English() {
           ) : (
             <p className="mt-1 text-sm text-gray-500">No lessons yet today 🦉</p>
           )}
+          {todaySpeaking?.lessons ? (
+            <div className="mt-1 flex justify-end gap-3.5 text-sm whitespace-nowrap sm:justify-start">
+              <span>
+                <span className="font-bold text-violet-300">{todaySpeaking.minutes}</span>
+                <span className="ml-1 text-gray-500">min speaking</span>
+              </span>
+              <span>
+                <span className="font-bold text-gray-200">{todaySpeaking.lessons}</span>
+                <span className="ml-1 text-gray-500">{todaySpeaking.lessons === 1 ? 'lesson' : 'lessons'}</span>
+              </span>
+            </div>
+          ) : null}
           </div>
         </div>
         <RecentPanel />
@@ -1131,16 +1166,28 @@ export default function English() {
         </Card>
       )}
 
-      {/* 3 · Activity:30 天面积图 + 绿墙 + 累计数字 */}
+      {/* 3 · Speaking practice:Praktika 口语(无数据不渲染) */}
+      <SpeakingPractice today={todayIso} />
+
+      {/* 4 · Activity:30 天分钟柱(按 App 叠放)+ XP 虚线 + 绿墙 + 累计数字 */}
       <Card>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="flex items-baseline gap-2 text-sm font-medium text-gray-300">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5">
+          <h2 className="flex items-baseline gap-2 text-sm font-medium whitespace-nowrap text-gray-300">
             Activity
-            <span className="text-xs font-normal text-gray-500">last 30 days</span>
+            <span className="text-xs font-normal text-gray-500">last 30 days · minutes</span>
           </h2>
-          <span className="flex items-center gap-2 text-xs text-gray-500">
-            <span className="inline-block size-2 rounded-full bg-cyan-400" /> XP
-            <span className="ml-2 inline-block size-2 rounded-full bg-violet-400" /> minutes
+          <span className="flex flex-wrap items-center gap-x-3.5 gap-y-1 text-xs text-gray-500">
+            <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+              <span className="size-2 rounded-sm bg-cyan-400" /> Duolingo
+            </span>
+            {hasSpeaking && (
+              <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                <span className="size-2 rounded-sm bg-violet-400" /> Praktika
+              </span>
+            )}
+            <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+              <span className="w-3.5 border-t-2 border-dotted border-gray-300" /> Duolingo XP
+            </span>
           </span>
         </div>
         {days.length > 1 ? (
@@ -1152,7 +1199,7 @@ export default function English() {
         )}
         <div className="mt-5 grid gap-5 border-t border-gray-800 pt-4 sm:grid-cols-2 sm:gap-7">
           <div className="min-w-0 sm:mx-auto sm:w-fit sm:max-w-full">
-            <Eyebrow>Every day since {fmtDate(days[0]?.date ?? first.date)}</Eyebrow>
+            <Eyebrow>Every day since {fmtDate(days[0]?.date ?? first.date)} · minutes</Eyebrow>
             <div className="mt-2">
               <ActivityWall />
             </div>
@@ -1164,17 +1211,30 @@ export default function English() {
               <span className="size-2.5 rounded-sm bg-emerald-500" />
               <span className="size-2.5 rounded-sm bg-emerald-300" />
               More
+              {hasSpeaking && (
+                <>
+                  <span className="ml-2 size-2.5 rounded-sm bg-gray-800 ring-2 ring-inset ring-violet-400" />
+                  speaking
+                </>
+              )}
             </div>
           </div>
           <div className="grid content-center justify-center grid-cols-2 gap-x-4 gap-y-3.5 min-[420px]:grid-cols-3 sm:grid-cols-[repeat(3,auto)] sm:gap-x-9">
-            <Fact value={latest.totalXp.toLocaleString()} label="total XP" />
-            <Fact value={`${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`} label="time tracked" />
-            <Fact value={`${avgMinutes} min`} label="avg / active day" />
-            <Fact value={String(current.sessionCount ?? '—')} label="lifetime lessons" />
+            <Fact value={latest.totalXp.toLocaleString()} label="Duolingo XP" />
             <Fact
-              value={bestDay ? bestDay.xp.toLocaleString() : '—'}
-              label={bestDay ? `best day · ${bestDay.date.slice(5)}` : 'best day'}
+              value={`${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`}
+              label={hasSpeaking ? `time tracked · ${fmtDuration(speakingMinutes)} speaking` : 'time tracked'}
             />
+            <Fact value={`${avgMinutes} min`} label="avg / active day" />
+            <Fact value={String(current.sessionCount ?? '—')} label="Duolingo lessons" />
+            {hasSpeaking ? (
+              <Fact value={String(speakingLessons)} label="speaking lessons" />
+            ) : (
+              <Fact
+                value={bestDay ? bestDay.xp.toLocaleString() : '—'}
+                label={bestDay ? `best day · ${bestDay.date.slice(5)}` : 'best day'}
+              />
+            )}
             <Fact value={String(current.longestStreak ?? latest.streak)} label="longest streak" />
           </div>
         </div>
@@ -1182,7 +1242,9 @@ export default function English() {
 
       <p className="text-sm text-gray-500">
         Data source: Duolingo API (updated daily via GitHub Actions) · study time as recorded by
-        Duolingo. Score tracked since Aug 16 — earlier moves unrecorded, Aug 16–20 reconstructed from
+        Duolingo.{' '}
+        {hasSpeaking &&
+          'Speaking: Praktika app data, minutes from lesson start to finish, abandoned attempts not counted; days in Beijing time. '} Score tracked since Aug 16 — earlier moves unrecorded, Aug 16–20 reconstructed from
         unit progress. Score step dates from lesson timestamps since Aug 29 and from snapshot times
         before. Started Jul 27 via placement test (Intro skipped, score placed in A1); ≈ is the
         estimate for the next score 🦉

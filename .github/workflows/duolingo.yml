@@ -28,14 +28,31 @@ jobs:
           # 漏了这三行,CI 会静默退化为纯公开模式(无日明细),2026-08-17 排查发现从一开始就漏了
           DUOLINGO_JWT: ${{ secrets.DUOLINGO_JWT }}
 
+      # Praktika(口语)搭同一个 workflow:部署靠 deploy.yml 监听本 workflow 名触发,另起一个就要再配一遍。
+      # 失败不拦多邻国快照的提交(continue-on-error),但最后一步会把整个 run 标红。
+      # Secret 没配 = 停用 Praktika 采集:脚本只打警告、正常退出。
+      - name: Fetch Praktika sessions
+        id: praktika
+        continue-on-error: true
+        run: python3 scripts/fetch-praktika.py
+        env:
+          PRAKTIKA_REFRESH_TOKEN: ${{ secrets.PRAKTIKA_REFRESH_TOKEN }}
+
       - name: Commit if changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/duolingo-history.json
+          if [ -f data/praktika-history.json ]; then git add data/praktika-history.json; fi
           if git diff --cached --quiet; then
             echo "No changes"
           else
             git commit -m "chore: duolingo snapshot $(date -u +%F)"
             git push
           fi
+
+      - name: Fail if Praktika fetch failed
+        if: steps.praktika.outcome == 'failure'
+        run: |
+          echo "::error::Praktika fetch failed (refresh token revoked or API changed); Duolingo snapshot was still committed"
+          exit 1

@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import history from '../../data/duolingo-history.json'
 import { Card, SectionTitle } from '../components/ui'
 import { usePageTitle } from '../hooks/usePageTitle'
+import { fmtDuration, hasSpeaking, praktika, speakingLessons, speakingMinutes } from '../lib/praktika'
 
 // since 取真实起点:建站 = 仓库首提交,条目本身 = git 历史里首次出现的日期
 const sections = [
@@ -74,6 +75,12 @@ export default function Now() {
           {latest.totalXp.toLocaleString()} XP in total. Over the past two weeks:{' '}
           {activeDays}/{last14.length} days active, ~{avgMinutes} min a day.
         </p>
+        {hasSpeaking && praktika.meta.since && (
+          <p className="mt-2 leading-relaxed text-gray-300">
+            🎙 Speaking practice with an AI tutor on Praktika since {prettyDate(praktika.meta.since)} —{' '}
+            {speakingLessons} {speakingLessons === 1 ? 'lesson' : 'lessons'}, {fmtDuration(speakingMinutes)} so far.
+          </p>
+        )}
         <p className="mt-2 leading-relaxed text-gray-300">
           🎯 Goal: hold everyday conversations entirely in English.
         </p>
