@@ -3,9 +3,9 @@
     "since": "2026-11-11"
   },
   "current": {
-    "streak": 1,
-    "streakEnd": "2026-11-11",
-    "longestStreak": 1,
+    "streak": 2,
+    "streakEnd": "2026-11-12",
+    "longestStreak": 2,
     "level": "A0_1",
     "dailyGoal": 15,
     "plan": [
@@ -20,12 +20,12 @@
           {
             "name": "be动词",
             "lessons": 3,
-            "state": "doing"
+            "state": "done"
           },
           {
             "name": "自我介绍",
             "lessons": 4,
-            "state": "todo"
+            "state": "doing"
           },
           {
             "name": "介绍他人",
@@ -86,9 +86,45 @@
       "lessons": 5,
       "minutes": 42,
       "aborted": 3
+    },
+    "2026-11-12": {
+      "lessons": 4,
+      "minutes": 28
     }
   },
   "sessions": [
+    {
+      "id": "89327696-b886-4347-a971-cc1e2c422506",
+      "date": "2026-11-12",
+      "start": "22:53",
+      "seconds": 324,
+      "caption": "国家和国籍",
+      "lessonId": "e9aef15c-eb95-4b0a-8369-ee5845123991"
+    },
+    {
+      "id": "69d2e79f-e698-45fc-8a0b-dd1ee4e02f72",
+      "date": "2026-11-12",
+      "start": "22:43",
+      "seconds": 580,
+      "caption": "线上介绍",
+      "lessonId": "70803e5e-20a7-4d8c-a10d-30e7e993498e"
+    },
+    {
+      "id": "6f2fb1c0-e2e3-49d8-b5c5-e40ef23a0af5",
+      "date": "2026-11-12",
+      "start": "22:38",
+      "seconds": 235,
+      "caption": "信息交流",
+      "lessonId": "c7cb12a4-5e3b-49f5-b259-cda14fcd8b9f"
+    },
+    {
+      "id": "df264ed4-eaba-4758-9791-2774049614df",
+      "date": "2026-11-12",
+      "start": "22:28",
+      "seconds": 535,
+      "caption": "基础问句",
+      "lessonId": "4323d7e5-8b70-4db8-b27e-4ce36fd70e61"
+    },
     {
       "id": "6485cc42-95d6-4e4b-8121-2750d1de9c05",
       "date": "2026-11-11",
@@ -182,6 +218,46 @@
     "you": {
       "zh": "你；你们",
       "date": "2026-11-11"
+    },
+    "American": {
+      "zh": "美国人；美国的",
+      "date": "2026-11-12"
+    },
+    "Australian": {
+      "zh": "澳大利亚人；澳大利亚的",
+      "date": "2026-11-12"
+    },
+    "British": {
+      "zh": "英国人；英国的",
+      "date": "2026-11-12"
+    },
+    "Canadian": {
+      "zh": "加拿大人；加拿大的",
+      "date": "2026-11-12"
+    },
+    "I am a student": {
+      "zh": "我是一名学生",
+      "date": "2026-11-12"
+    },
+    "I am from": {
+      "zh": "我来自",
+      "date": "2026-11-12"
+    },
+    "Japanese": {
+      "zh": "日本人；日本的",
+      "date": "2026-11-12"
+    },
+    "My name is": {
+      "zh": "我的名字是",
+      "date": "2026-11-12"
+    },
+    "Nice to meet you": {
+      "zh": "很高兴认识你",
+      "date": "2026-11-12"
+    },
+    "country": {
+      "zh": "国家",
+      "date": "2026-11-12"
     }
   }
 }
