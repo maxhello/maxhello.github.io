@@ -25,12 +25,12 @@
           {
             "name": "自我介绍",
             "lessons": 4,
-            "state": "doing"
+            "state": "done"
           },
           {
             "name": "介绍他人",
             "lessons": 4,
-            "state": "todo"
+            "state": "doing"
           },
           {
             "name": "简单介绍",
@@ -90,9 +90,37 @@
     "2026-11-12": {
       "lessons": 4,
       "minutes": 28
+    },
+    "2026-11-13": {
+      "lessons": 3,
+      "minutes": 27
     }
   },
   "sessions": [
+    {
+      "id": "8b4d37af-d7ae-4bed-8cc7-aadef9a33481",
+      "date": "2026-11-13",
+      "start": "23:46",
+      "seconds": 486,
+      "caption": "介绍朋友",
+      "lessonId": "c67b3c9f-3826-42d8-ba17-35186a0ed70a"
+    },
+    {
+      "id": "ca197eb6-dc86-4d7d-89cd-b2cbc00bbba0",
+      "date": "2026-11-13",
+      "start": "23:34",
+      "seconds": 701,
+      "caption": "语音变化",
+      "lessonId": "a51a618c-cb41-41a0-9ea3-35f05446cd22"
+    },
+    {
+      "id": "793cb322-44fa-4c46-93b2-0aef797e8473",
+      "date": "2026-11-13",
+      "start": "23:26",
+      "seconds": 432,
+      "caption": "宿舍聊天",
+      "lessonId": "ba0d8b41-e37e-4466-911e-860b9f3d9983"
+    },
     {
       "id": "89327696-b886-4347-a971-cc1e2c422506",
       "date": "2026-11-12",
@@ -258,6 +286,46 @@
     "country": {
       "zh": "国家",
       "date": "2026-11-12"
+    },
+    "My phone number is": {
+      "zh": "我的电话号码是",
+      "date": "2026-11-13"
+    },
+    "That is a teacher.": {
+      "zh": "那是一名老师。",
+      "date": "2026-11-13"
+    },
+    "That is my friend.": {
+      "zh": "那是我的朋友。",
+      "date": "2026-11-13"
+    },
+    "This is a doctor.": {
+      "zh": "这是一名医生。",
+      "date": "2026-11-13"
+    },
+    "This is my friend.": {
+      "zh": "这是我的朋友。",
+      "date": "2026-11-13"
+    },
+    "What do you do?": {
+      "zh": "你是做什么工作的？",
+      "date": "2026-11-13"
+    },
+    "What’s your name?": {
+      "zh": "你叫什么名字？",
+      "date": "2026-11-13"
+    },
+    "Where are you from?": {
+      "zh": "你来自哪里？",
+      "date": "2026-11-13"
+    },
+    "friend": {
+      "zh": "朋友",
+      "date": "2026-11-13"
+    },
+    "roommate": {
+      "zh": "室友",
+      "date": "2026-11-13"
     }
   }
 }
