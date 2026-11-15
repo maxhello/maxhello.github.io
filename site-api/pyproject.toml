@@ -1,7 +1,7 @@
 [project]
-name = "tutor-server"
+name = "site-api"
 version = "1.0.0"
-description = "History backend for the livekit-tutor voice practice app"
+description = "Backend of the personal site: voice-tutor history + learning data"
 requires-python = ">=3.10"
 
 dependencies = [

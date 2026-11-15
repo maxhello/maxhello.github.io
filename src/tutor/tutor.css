@@ -1,7 +1,10 @@
-@import 'tailwindcss';
-
-/* 站点主题(与个人站同款 dark + cyan/violet) */
-body {
+/*
+ * 口语陪练页(/english/tutor)专用样式。2026-11-15 前是独立应用 livekit-tutor 的 index.css。
+ * 由 pages/Tutor.tsx 懒加载的 chunk 带入;页面不套站点 Layout,底色/字体挂在 .tutor-app 容器上。
+ * 这里的颜色是该页自成一套的通话界面配色(并入前的原样),不走站点的 .card/.btn-* 体系。
+ */
+.tutor-app {
+  min-height: 100dvh;
   background: #030712;
   color: #f3f4f6;
   font-family:
@@ -15,16 +18,16 @@ body {
   color: #fff;
 }
 
-.btn-primary {
+.tutor-btn-primary {
   background: linear-gradient(90deg, #0891b2, #7c3aed);
   color: #fff;
   font-weight: 600;
   transition: opacity 0.2s;
 }
-.btn-primary:hover:not(:disabled) {
+.tutor-btn-primary:hover:not(:disabled) {
   opacity: 0.9;
 }
-.btn-primary:disabled {
+.tutor-btn-primary:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }

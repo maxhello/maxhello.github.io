@@ -14,7 +14,7 @@
 只有 COMPLETED 计入课数/时长;ABORTED 只记次数。sessions 明细只保留近 RETAIN_DAYS 天,
 更早的天只留 daily 汇总,文件不随时间膨胀(全部进前端 bundle)。
 
-用法: PRAKTIKA_REFRESH_TOKEN=... python3 scripts/fetch-praktika.py
+用法: PRAKTIKA_REFRESH_TOKEN=... python3 site-api/collectors/praktika.py(仓库根目录下)
      本地 python.org 安装缺 CA 时加 PRAKTIKA_INSECURE=1(DUOLINGO_INSECURE=1 也认)
 CI:  与多邻国同一个 workflow 跑。Secret 没配 → 警告并跳过(删 Secret 即停用);
      配了却拉取失败(token 失效 / 接口变了)→ exit 1 报红,不静默提交残缺数据。
@@ -38,7 +38,9 @@ REFERER = "https://app.praktika.ai/"
 PAGE = 20  # sessions 接口 limit 上限
 RETAIN_DAYS = 30  # sessions 明细保留天数(页面只展示最近几节,daily 汇总全量保留)
 RECENT_OVERLAP_DAYS = 2  # 增量拉取时往回多看几天,覆盖跨夜/接口延迟
-OUT = Path(__file__).resolve().parent.parent / "data" / "praktika-history.json"
+# 文件模式(GitHub Actions / 本地)写仓库根的 data/,须从仓库根目录运行;
+# 数据库模式(k3s CronJob)由 collect.py 把 OUT 指到临时文件,再把结果存进 PostgreSQL。
+OUT = Path("data") / "praktika-history.json"
 TZ = ZoneInfo("Asia/Shanghai")
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
 

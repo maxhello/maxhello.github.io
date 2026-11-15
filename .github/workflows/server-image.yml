@@ -1,12 +1,12 @@
-# 陪练后端镜像:push 触碰 tutor/server/** 时构建并推 GHCR,服务器上 rollout restart 即更新。
-# 镜像包 tutor-api 原属 livekit-tutor 仓库(2026-11-15 并入本仓库),
-# 需在 GHCR 包设置的 Manage Actions access 里给本仓库 Write 权限,否则推送 403。
+# 后端镜像(site-api/):push 触碰 site-api/** 时构建并推 GHCR,服务器上 rollout restart 即更新。
+# 包名 site-api(2026-11-15 并入本仓库时新建:后端既管陪练也管站点学习数据;旧包 tutor-api 属于已停用的 livekit-tutor 仓库)。
+# 包可见性须为 Public(k3s 不带 imagePullSecret)。
 name: server-image
 
 on:
   push:
     branches: [main]
-    paths: ["tutor/server/**", ".github/workflows/server-image.yml"]
+    paths: ["site-api/**", ".github/workflows/server-image.yml"]
   workflow_dispatch:
 
 permissions:
@@ -31,9 +31,9 @@ jobs:
 
       - uses: docker/build-push-action@v6
         with:
-          context: ./tutor/server
+          context: ./site-api
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/tutor-api:latest
+          tags: ghcr.io/${{ github.repository_owner }}/site-api:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max

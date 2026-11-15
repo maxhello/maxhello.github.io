@@ -9,10 +9,11 @@
     "prebuild": "npm run data",
     "build": "tsc -b && vite build",
     "guidebooks": "python3 scripts/fetch-guidebooks.py",
-    "test:py": "python3 scripts/test_fetch_duolingo.py && python3 scripts/test_fetch_praktika.py",
+    "test:py": "cd site-api && uv run pytest -q",
     "preview": "vite preview"
   },
   "dependencies": {
+    "livekit-client": "^2.24.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.6.0",

@@ -1,5 +1,6 @@
 # syntax=docker/dockerfile:1
-# 历史后端镜像:uv + uvicorn,单阶段(纯 Python 无编译依赖)
+# 陪练后端镜像:uv + uvicorn,单阶段(纯 Python 无编译依赖)
+# 同一个镜像也给 k3s CronJob 跑采集:command 换成 python collect.py run
 
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 
@@ -10,7 +11,8 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN uv sync --locked --no-dev
 
-COPY main.py models.py auth.py ./
+COPY main.py models.py auth.py collect.py ./
+COPY collectors ./collectors
 
 # 非 root 运行
 ARG UID=10001

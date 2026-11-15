@@ -189,7 +189,7 @@ export default function UnitDrawer({
                 ) : (
                   <button
                     onClick={() => onPick(unit.unitIndex)}
-                    className="btn-primary min-h-12 w-full rounded-2xl text-[15px]"
+                    className="tutor-btn-primary min-h-12 w-full rounded-2xl text-[15px]"
                   >
                     练这个单元
                   </button>

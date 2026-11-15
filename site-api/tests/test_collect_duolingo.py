@@ -14,16 +14,10 @@
   - summaries_to_daily:xp_summaries → daily(真实时长四舍五入、没学的天不产生条目、归日北京时间)
   - normalize_token:剥掉手滑带上的 Bearer 前缀(2026-08-17 本地排查时踩过的坑)
 """
-import importlib.util
 import unittest
 from datetime import datetime, timezone
-from pathlib import Path
 
-_spec = importlib.util.spec_from_file_location(
-    "fetch_duolingo", Path(__file__).resolve().parent / "fetch-duolingo.py"
-)
-fd = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(fd)
+from collectors import duolingo as fd
 
 
 class DayKeyTest(unittest.TestCase):

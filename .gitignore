@@ -12,3 +12,10 @@ public/robots.txt
 
 # python 测试缓存
 __pycache__/
+
+# python 项目(site-api / tutor-agent)
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+*.db

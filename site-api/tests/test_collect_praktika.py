@@ -9,15 +9,9 @@
   - merge:sessions 去重与保留窗口、daily 只重算窗口内的天(窗口外明细已裁,重算会写残)、
     aborted 次数、words 只增不改、current 缺值沿用旧值
 """
-import importlib.util
 import unittest
-from pathlib import Path
 
-_spec = importlib.util.spec_from_file_location(
-    "fetch_praktika", Path(__file__).resolve().parent / "fetch-praktika.py"
-)
-fp = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(fp)
+from collectors import praktika as fp
 
 
 def sess(id, date, start="21:00", seconds=600, caption="x"):

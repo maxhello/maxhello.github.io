@@ -1,4 +1,4 @@
-"""livekit-tutor 历史后端:FastAPI 应用与路由。
+"""site-api:个人站点后端(口语陪练的登录/房间/历史 + 学习数据只读接口),FastAPI 应用与路由。
 
 模型在 models.py,鉴权在 auth.py。职责:
 - GitHub PAT 登录校验(服务端调 GitHub API + 白名单)→ 签发 30 天 JWT
@@ -26,7 +26,7 @@ from urllib.parse import urlencode, urlsplit
 import httpx
 from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from livekit import api as lk_api
 from livekit.protocol import agent_dispatch as lk_dispatch
 from livekit.protocol.room import RoomConfiguration
@@ -36,8 +36,10 @@ from sqlalchemy.orm import Session
 
 from auth import GITHUB_ALLOWLIST, JWT_SECRET, _github_login, current_user, make_token
 from models import (
+    LEARNING_DOC_KEYS,
     Base,
     CorrectionRow,
+    LearningDocRow,
     MessageRow,
     SessionRow,
     UserRow,
@@ -63,7 +65,7 @@ LIVEKIT_API_SECRET = os.getenv("LIVEKIT_API_SECRET", "")
 ROOM_NAME = "tutor-max"
 CALLER_IDENTITY = "max"
 CALLER_NAME = "Max"
-AGENT_NAME = "livekit-tutor"  # 对应 agent/ 里 @server.rtc_session(agent_name=...)
+AGENT_NAME = "livekit-tutor"  # 对应 tutor-agent/agent/ 里 @server.rtc_session(agent_name=...),是 LiveKit 上的 agent 名,别改
 ROOM_TOKEN_TTL = datetime.timedelta(hours=12)
 # 会话 id 写进参与者 attributes(用户没有改自己 attributes 的权限),
 # webhook 的 participant_left 原样带回,据此找到是哪次会话
@@ -162,7 +164,7 @@ def practice_of(body: TokenIn | None) -> dict[str, Any] | None:
 # ---------------------------------------------------------------- app
 
 
-app = FastAPI(title="livekit-tutor history API", lifespan=lifespan)
+app = FastAPI(title="site-api", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
@@ -502,3 +504,21 @@ def delete_session(
     db.delete(_find_session(db, user, session_id))
     db.commit()
     return {"ok": True}
+
+
+# ---------- 学习数据(多邻国 / Praktika)----------
+# 公开只读:个人站点的 English / Now / Learn 页直接读,内容与原先仓库里的 data/*.json 一致。
+# 写入只走 collect.py(k3s CronJob / 手工 seed),这里不开写接口。
+LEARNING_CACHE = "public, max-age=300"
+
+
+@app.get("/api/learning/{key}")
+def learning_doc(key: str, db: Session = Depends(get_db)) -> JSONResponse:
+    row = None
+    if key in LEARNING_DOC_KEYS:
+        row = db.scalar(
+            select(LearningDocRow).where(LearningDocRow.key == key, LearningDocRow.is_latest)
+        )
+    if not row:
+        raise HTTPException(404, "no such document")
+    return JSONResponse(row.doc, headers={"Cache-Control": LEARNING_CACHE})

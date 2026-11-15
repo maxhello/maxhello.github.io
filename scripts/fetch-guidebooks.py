@@ -14,7 +14,7 @@ DUOLINGO_GUIDEBOOK_SECTIONS=N 可指定拉前 N 个 section。增量:已在档�
 DUOLINGO_GUIDEBOOK_REFRESH=1 强制全量重拉。
 
 用法:DUOLINGO_JWT=… [DUOLINGO_INSECURE=1] python3 scripts/fetch-guidebooks.py
-复用 fetch-duolingo.py 的 get_json / normalize_token / AUTH_API(文件名带连字符,用 importlib 加载)。
+复用 site-api/collectors/duolingo.py 的 get_json / normalize_token / AUTH_API(文件名带连字符,用 importlib 加载)。
 """
 import importlib.util
 import json
@@ -32,7 +32,9 @@ def tts_id(url) -> str:
     url = url or ""
     return url[len(TTS_BASE):] if url.startswith(TTS_BASE) else url
 
-_spec = importlib.util.spec_from_file_location("fetch_duolingo", HERE / "fetch-duolingo.py")
+_spec = importlib.util.spec_from_file_location(
+    "fetch_duolingo", HERE.parent / "site-api" / "collectors" / "duolingo.py"
+)
 fd = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(fd)
 

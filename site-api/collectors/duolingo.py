@@ -13,7 +13,7 @@
 一天一条,同日重跑覆盖;快照行的"今天"在北京凌晨 5 点前算前一天(CI 定时漂移到凌晨时仍归前一晚)。
 归日统一按北京时间(Asia/Shanghai),与多邻国 streak 口径一致,本地跑和 CI(UTC)结果相同。
 
-用法: python3 scripts/fetch-duolingo.py
+用法: python3 site-api/collectors/duolingo.py(仓库根目录下)
 CI:  GitHub Actions 每日定时跑,自动 commit 数据文件。
 """
 import json
@@ -32,7 +32,9 @@ PUBLIC_API = f"https://www.duolingo.com/2017-06-30/users?username={USERNAME}"
 AUTH_API = f"https://www.duolingo.com/2017-06-30/users/{USER_ID}"
 SUMMARY_API = f"https://www.duolingo.com/2017-06-30/users/{USER_ID}/xp_summaries"
 SUMMARY_DAYS = 45  # 每次回看多少天的 xp_summaries(合并只增不减,窗口只需覆盖可能被回填的近期)
-OUT = Path(__file__).resolve().parent.parent / "data" / "duolingo-history.json"
+# 文件模式(GitHub Actions / 本地)写仓库根的 data/,须从仓库根目录运行;
+# 数据库模式(k3s CronJob)由 collect.py 把 OUT 指到临时文件,再把结果存进 PostgreSQL。
+OUT = Path("data") / "duolingo-history.json"
 
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
 TZ = ZoneInfo("Asia/Shanghai")  # 归日时区固定为北京时间,不随运行环境(本地/CI)漂移

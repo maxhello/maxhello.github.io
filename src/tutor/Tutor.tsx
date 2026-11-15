@@ -28,7 +28,7 @@ const CURRENT_KEY = 'tutor-current'
 /** 我方 participant identity(后端签 token 时写死),转录按身份区分左右气泡 */
 const MY_IDENTITY = 'max'
 /** 前端版本号:每次改前端手动 +1,页脚展示,用于核对线上是否为最新部署 */
-const APP_VERSION = 'v14'
+const APP_VERSION = 'v15'
 /** 挂断自动保存的最多尝试次数 */
 const SAVE_ATTEMPTS = 3
 /** 新纠错提示在视频上停留的毫秒数 */
@@ -854,7 +854,7 @@ export default function Tutor() {
 
         <button
           onClick={start}
-          className="btn-primary flex min-h-[60px] items-center gap-3 rounded-full px-9 text-lg shadow-[0_12px_32px_rgba(124,58,237,.3)]"
+          className="tutor-btn-primary flex min-h-[60px] items-center gap-3 rounded-full px-9 text-lg shadow-[0_12px_32px_rgba(124,58,237,.3)]"
         >
           <MicIcon />
           {current ? '开始通话' : '登录 GitHub 后开始'}

@@ -591,3 +591,27 @@ def test_webhook_ignores_unrelated_events():
         assert post_webhook(c, attributes={"session_id": "999999"}).status_code == 200
         assert post_webhook(c, attributes={"session_id": "abc"}).status_code == 200
         assert ended_at(sid) is None
+
+
+# ---------- 学习数据文档(公开只读)----------
+
+
+def test_learning_doc_is_public_and_keeps_key_order():
+    import collect
+    import models
+
+    doc = {"unitDone": {"9": "2026-08-01", "10": "2026-08-03"}, "days": [{"date": "2026-08-03"}]}
+    with make_client() as client:
+        with models.SessionLocal() as db:
+            collect.save_doc(db, "duolingo-history", doc)
+        r = client.get("/api/learning/duolingo-history")
+        assert r.status_code == 200
+        assert r.json() == doc
+        assert list(r.json()["unitDone"]) == ["9", "10"]  # 键顺序原样保留
+        assert "max-age" in r.headers["cache-control"]
+
+
+def test_learning_doc_unknown_or_missing_is_404():
+    with make_client() as client:
+        assert client.get("/api/learning/praktika-history").status_code == 404
+        assert client.get("/api/learning/users").status_code == 404
