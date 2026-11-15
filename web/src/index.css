@@ -1,7 +1,4 @@
 @import "tailwindcss";
-/* 仓库里的两个 Python 项目不是前端源码,别让 Tailwind 扫进去凭空生成 class */
-@source not "../site-api";
-@source not "../tutor-agent";
 
 /* ─────────────────────────────────────────────────────────
    Design tokens & 全站复用样式层

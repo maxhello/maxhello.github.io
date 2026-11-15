@@ -65,7 +65,7 @@ LIVEKIT_API_SECRET = os.getenv("LIVEKIT_API_SECRET", "")
 ROOM_NAME = "tutor-max"
 CALLER_IDENTITY = "max"
 CALLER_NAME = "Max"
-AGENT_NAME = "livekit-tutor"  # 对应 tutor-agent/agent/ 里 @server.rtc_session(agent_name=...),是 LiveKit 上的 agent 名,别改
+AGENT_NAME = "livekit-tutor"  # 对应 agents/tutor/agent/ 里 @server.rtc_session(agent_name=...),是 LiveKit 上的 agent 名,别改
 ROOM_TOKEN_TTL = datetime.timedelta(hours=12)
 # 会话 id 写进参与者 attributes(用户没有改自己 attributes 的权限),
 # webhook 的 participant_left 原样带回,据此找到是哪次会话

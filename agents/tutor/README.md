@@ -1,8 +1,8 @@
-# tutor-agent(原 livekit-tutor)
+# agents/tutor(原 livekit-tutor)
 
-> 2026-11-15 并入个人站点仓库,原来的三部分分住三处:语音 agent 在本目录;陪练页在站点的 `src/tutor/`
+> 2026-11-15 并入个人站点仓库,原来的三部分分住三处:语音 agent 在本目录;陪练页在站点的 `web/src/tutor/`
 > (网址 https://maxhello.github.io/english/tutor ,旧的 /livekit-tutor/ 会自动跳转);后端在仓库根的 `site-api/`。
-> 下文若仍写 `web/`、`server/`,分别对应这两处。最新说明以本目录的 CLAUDE.md 为准。
+> 下文是并入前的旧说明,其中的 `web/`、`server/` 分别对应这两处(不是现在仓库根的 `web/` 整个目录)。最新说明以本目录的 CLAUDE.md 为准。
 
 AI 英语口语陪练(Emma):双语短句教学,面向 A1 初学者,自用。
 

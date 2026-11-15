@@ -33,7 +33,7 @@ def tts_id(url) -> str:
     return url[len(TTS_BASE):] if url.startswith(TTS_BASE) else url
 
 _spec = importlib.util.spec_from_file_location(
-    "fetch_duolingo", HERE.parent / "site-api" / "collectors" / "duolingo.py"
+    "fetch_duolingo", HERE.parent.parent / "site-api" / "collectors" / "duolingo.py"
 )
 fd = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(fd)

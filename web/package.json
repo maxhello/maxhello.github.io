@@ -9,7 +9,7 @@
     "prebuild": "npm run data",
     "build": "tsc -b && vite build",
     "guidebooks": "python3 scripts/fetch-guidebooks.py",
-    "test:py": "cd site-api && uv run pytest -q",
+    "test:py": "cd ../site-api && uv run pytest -q",
     "preview": "vite preview"
   },
   "dependencies": {
