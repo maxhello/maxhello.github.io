@@ -31,10 +31,20 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            tutor/web/package-lock.json
       - run: npm ci
       - run: npm run build
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # 陪练页(tutor/web,独立 Vite 应用,base=/livekit-tutor/)构建进站点子目录,
+      # 网址沿用并入前的 maxhello.github.io/livekit-tutor/
+      - name: Build tutor web into dist/livekit-tutor
+        run: |
+          npm ci --prefix tutor/web
+          npm run build --prefix tutor/web
+          cp -r tutor/web/dist dist/livekit-tutor
       # SPA 路由需要 404 兜底,否则刷新 /blog 等路径会 404
       - run: cp dist/index.html dist/404.html
       - uses: actions/upload-pages-artifact@v5

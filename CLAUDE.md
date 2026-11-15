@@ -12,6 +12,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 个人站点(https://maxhello.github.io):React 19 + Vite 6 + TypeScript + Tailwind CSS 4 + MDX 博客 + 英语学习数据面板。全静态,GitHub Pages 部署,无后端。
 
+## 仓库构成(2026-11-15 起)
+
+- 根目录 = 个人站点(本文件主要描述它)。
+- `tutor/` = AI 口语陪练 Emma(原独立仓库 maxhello/livekit-tutor,只搬了代码):`agent/`(LiveKit 语音 agent,`lk agent deploy`)、`web/`(陪练页,独立 Vite 应用)、`server/`(FastAPI + Neon PostgreSQL,跑在 k3s)。**细节看 `tutor/CLAUDE.md`**,改 tutor 前先读它。
+- 两个前端各自独立:各有 `package.json` / Tailwind 构建,互不 import。`deploy.yml` 先建站点,再把 `tutor/web` 建进 `dist/livekit-tutor/`(网址 `maxhello.github.io/livekit-tutor/` 不变)。站点 `src/index.css` 用 `@source not "../tutor"` 把 tutor 排除在 Tailwind 扫描外——删了这行站点 CSS 会多出 ~12KB 陪练页的 class。
+- `server-image.yml` 在 `tutor/server/**` 变动时构建 `ghcr.io/maxhello/tutor-api`;k8s 清单在私有仓库 oracle-k3s,不在这里。本机 kubectl 默认上下文是工作集群,**操作 k3s 一律显式 `--context oracle-k3s`**。
+- 进行中的规划:学习数据(多邻国/Praktika)从「GitHub Actions 定时 + JSON 进 git」迁到 tutor server 的 PostgreSQL + k3s CronJob;2026-11-15 已实测 Oracle IP 可正常访问两家接口。迁完前下文的数据流描述仍然有效。
+
 ## 常用命令
 
 ```bash
@@ -19,6 +27,8 @@ npm run dev        # 开发服务器(启动前自动跑 data 脚本生成 repos.
 npm run build      # tsc -b && vite build(先跑 prebuild → data 脚本)
 npx vite preview   # 预览 dist
 npm run test:py    # 多邻国脚本纯逻辑单测(stdlib unittest,零依赖)
+npm run build --prefix tutor/web        # 陪练页构建(首次先 npm ci --prefix tutor/web)
+(cd tutor && uv run pytest) ; (cd tutor/server && uv run pytest)   # 陪练 agent / 后端测试
 python3 scripts/fetch-duolingo.py   # 手动跑多邻国采集(见下)
 npm run guidebooks                  # 手动拉多邻国单元指南 → data/duolingo-guidebooks.json(需 DUOLINGO_JWT,本地加 DUOLINGO_INSECURE=1)
 ```
