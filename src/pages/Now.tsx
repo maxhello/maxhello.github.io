@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import history from '../../data/duolingo-history.json'
+import { learning } from '../lib/learning'
 import { Card, SectionTitle } from '../components/ui'
 import { usePageTitle } from '../hooks/usePageTitle'
 import { fmtDuration, hasSpeaking, praktika, speakingLessons, speakingMinutes } from '../lib/praktika'
@@ -35,7 +35,7 @@ interface HistoryData {
   daily?: Record<string, DayDetail>
 }
 
-const hist = history as HistoryData
+const hist = learning.duolingo as HistoryData
 const latest = hist.days[hist.days.length - 1]
 const last14 = Object.entries(hist.daily ?? {})
   .sort(([a], [b]) => a.localeCompare(b))

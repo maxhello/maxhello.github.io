@@ -28,7 +28,7 @@ export function useTutorStats(): Record<number, number> | null {
     const jwt = tutorJwt()
     if (!jwt) return
     let alive = true
-    fetch(`${site.tutor.api}/api/units/stats`, { headers: { Authorization: `Bearer ${jwt}` } })
+    fetch(`${site.api}/api/units/stats`, { headers: { Authorization: `Bearer ${jwt}` } })
       .then((r) => (r.ok ? (r.json() as Promise<Record<string, number>>) : null))
       .then((d) => {
         if (alive && d) setStats(Object.fromEntries(Object.entries(d).map(([k, v]) => [Number(k), v])))

@@ -1,8 +1,9 @@
 /**
- * Praktika(AI 口语 App)数据:data/praktika-history.json,由 scripts/fetch-praktika.py 每日采集。
+ * Praktika(AI 口语 App)数据:site-api 的 praktika-history 文档,由 site-api/collectors/praktika.py 每日采集。
  * English 页的 Pulse / Speaking practice / Activity 与 Now 页共用这一份派生数据。
+ * 派生值在模块加载时算一次,所以本模块只能被懒加载的数据页引用(见 lib/learning.ts)。
  */
-import raw from '../../data/praktika-history.json'
+import { learning } from './learning'
 
 export interface SpeakingDay {
   lessons: number
@@ -44,7 +45,7 @@ interface PraktikaHistory {
   words: Record<string, { zh: string; date: string }>
 }
 
-export const praktika = raw as PraktikaHistory
+export const praktika = learning.praktika as PraktikaHistory
 export const speakingDaily: Record<string, SpeakingDay> = praktika.daily ?? {}
 export const speakingDays = Object.entries(speakingDaily)
   .filter(([, v]) => v.lessons > 0)

@@ -1,37 +1,14 @@
 /**
- * 多邻国单元数据:打开页面时从个人站点仓库(maxhello.github.io)实时读两个 raw 文件。
- * - duolingo-history.json:每日快照,当前单元 = 最新一份带 score.lastUnitDone 的快照 + 1
- * - duolingo-guidebooks.json:每个单元的目标、关键句、语法点(多邻国 App 里的「指南」)
- * 算法与站点 src/pages/Learn.tsx / src/components/UnitGuide.tsx 保持一致。
- * raw.githubusercontent.com 允许跨域、gzip 后约 84KB、CDN 缓存 5 分钟。
+ * 陪练页用的多邻国单元数据,与站点学习路径页同源:
+ * - 进度:lib/learning.ts 的多邻国文档,当前单元 = 最新一份带 score.lastUnitDone 的快照 + 1
+ * - 指南:components/UnitGuide.tsx 的 loadGuidebooks()(每个单元的目标、关键句、语法点)
  */
+import { loadGuidebooks, type GuideUnit } from '../components/UnitGuide'
+import { learning, learningReady } from '../lib/learning'
 
-const RAW_BASE = 'https://raw.githubusercontent.com/maxhello/maxhello.github.io/main/data'
-
-/** 指南数据结构(与站点 src/components/UnitGuide.tsx 一致);tts 是读音地址(哈希,或完整 URL) */
-export type GuideWord = { w: string; hints: string[]; tts: string }
-export type GuideSentence = { en: string; zh: string; tts: string; words: GuideWord[] }
-export type GuideBlock = {
-  type: 'text' | 'example' | 'table'
-  text?: string
-  en?: string
-  zh?: string
-  tts?: string
-  rows?: string[][]
-}
-
-export type GuideUnit = {
-  unitIndex: number
-  section: number
-  unitInSection: number
-  cefr: string | null
-  objective: string
-  keySentences: GuideSentence[]
-  grammar: { title: string; blocks: GuideBlock[] }[]
-}
+export type { GuideBlock, GuideSentence, GuideUnit, GuideWord } from '../components/UnitGuide'
 
 type HistoryLite = { days: { score?: { lastUnitDone?: number } }[] }
-type GuideFile = { ttsBase: string; units: GuideUnit[] }
 
 /** 传给后端 /api/token 的单元练习材料(后端限长,原样转给 Emma) */
 export type UnitBrief = {
@@ -83,14 +60,11 @@ let cache: Promise<UnitData> | null = null
 /** 读进度 + 指南(同一页面只读一次);失败时 reject,调用方隐藏单元卡片 */
 export function loadUnits(): Promise<UnitData> {
   cache ??= Promise.all([
-    fetch(`${RAW_BASE}/duolingo-history.json`).then((r) => {
-      if (!r.ok) throw new Error(`history ${r.status}`)
-      return r.json() as Promise<HistoryLite>
+    learningReady.then((ok) => {
+      if (!ok) throw new Error('learning data unavailable')
+      return learning.duolingo as HistoryLite
     }),
-    fetch(`${RAW_BASE}/duolingo-guidebooks.json`).then((r) => {
-      if (!r.ok) throw new Error(`guidebooks ${r.status}`)
-      return r.json() as Promise<GuideFile>
-    }),
+    loadGuidebooks(),
   ])
     .then(([history, guide]) => {
       const lastUnitDone =

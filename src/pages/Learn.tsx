@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useSearchParams } from 'react-router-dom'
-import history from '../../data/duolingo-history.json'
+import { learning } from '../lib/learning'
 import { UnitGuideBody, unitLabel, useGuidebooks, type GuideUnit } from '../components/UnitGuide'
 import { usePageTitle } from '../hooks/usePageTitle'
 import { tutorHistoryUrl, tutorPracticeUrl, useTutorStats } from '../lib/tutor'
@@ -18,7 +18,7 @@ import { tutorHistoryUrl, tutorPracticeUrl, useTutorStats } from '../lib/tutor'
 interface HistoryLite {
   days: { score?: { lastUnitDone?: number } }[]
 }
-const hist = history as unknown as HistoryLite
+const hist = learning.duolingo as HistoryLite
 const lastUnitDone =
   [...hist.days].reverse().find((r) => r.score?.lastUnitDone != null)?.score?.lastUnitDone ?? -1
 const currentUnit = lastUnitDone + 1

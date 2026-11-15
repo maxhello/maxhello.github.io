@@ -16,10 +16,11 @@ export const site = {
   siteRepo: 'maxhello.github.io',
   /** 固定展示的仓库名(Projects 页置顶) */
   pinnedRepos: ['lp-lab', 'maxhello.github.io'],
-  /** AI 口语陪练:页面是本站路由(不套 Layout 的全屏通话页),后端 = site-api(也给学习路径页读练习次数) */
+  /** 后端 site-api(k3s;域名沿用早先的 tutor.*):学习数据只读接口 + 口语陪练的登录/房间/历史 */
+  api: 'https://tutor.161-118-222-205.sslip.io',
+  /** AI 口语陪练页:本站路由(不套 Layout 的全屏通话页) */
   tutor: {
     url: '/english/tutor',
-    api: 'https://tutor.161-118-222-205.sslip.io',
   },
   /** giscus 评论配置(giscus.app 生成,repo 改名后 ID 不变) */
   giscus: {

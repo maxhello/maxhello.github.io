@@ -38,8 +38,8 @@ REFERER = "https://app.praktika.ai/"
 PAGE = 20  # sessions 接口 limit 上限
 RETAIN_DAYS = 30  # sessions 明细保留天数(页面只展示最近几节,daily 汇总全量保留)
 RECENT_OVERLAP_DAYS = 2  # 增量拉取时往回多看几天,覆盖跨夜/接口延迟
-# 文件模式(GitHub Actions / 本地)写仓库根的 data/,须从仓库根目录运行;
-# 数据库模式(k3s CronJob)由 collect.py 把 OUT 指到临时文件,再把结果存进 PostgreSQL。
+# 正式跑法是数据库模式:k3s CronJob 经 collect.py 把 OUT 指到临时文件,再把结果存进 PostgreSQL。
+# 直接运行本文件是文件模式(本地调试):读写当前目录下的 data/。
 OUT = Path("data") / "praktika-history.json"
 TZ = ZoneInfo("Asia/Shanghai")
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"

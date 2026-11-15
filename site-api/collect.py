@@ -5,7 +5,7 @@
     python collect.py dump <key>                    # 把库里的文档打到 stdout
 
 采集器(collectors/)本身只认文件:读 OUT、合并、写回 OUT。这里把库里的文档落到临时文件、
-把采集器的 OUT 指过去、跑完再读回来存库——采集与合并逻辑一行不改,文件模式(GitHub Actions)照常可用。
+把采集器的 OUT 指过去、跑完再读回来存库——采集与合并逻辑一行不改(沿用 GitHub Actions 时代的实现与单测)。
 
 环境变量:DATABASE_URL(同 API)、DUOLINGO_JWT、PRAKTIKA_REFRESH_TOKEN(不配 = 停用 Praktika)。
 任何一个数据源失败:库里的旧文档原样保留,其余数据源照跑,最后以非零退出(CronJob 显示失败)。

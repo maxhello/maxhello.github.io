@@ -1,5 +1,5 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import history from '../../data/duolingo-history.json'
+import { learning } from '../lib/learning'
 import { Link } from 'react-router-dom'
 import { Card, SectionTitle, SectionSubtitle } from '../components/ui'
 import { usePageTitle } from '../hooks/usePageTitle'
@@ -47,7 +47,7 @@ interface DayRow {
   apiCoverage?: string
 }
 
-/** duolingo-history.json 顶层结构(2026-08-20 起:list → 对象) */
+/** 多邻国文档(site-api 的 duolingo-history)顶层结构(2026-08-20 起:list → 对象) */
 interface HistoryData {
   meta: { username?: string; streakStart?: string; learningLanguage?: string }
   current: {
@@ -72,7 +72,7 @@ interface HistoryData {
   }
 }
 
-const hist = history as HistoryData
+const hist = learning.duolingo as HistoryData
 const rows = hist.days
 const latest = rows[rows.length - 1]
 const first = rows[0]

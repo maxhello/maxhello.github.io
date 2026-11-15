@@ -28,7 +28,7 @@ const CURRENT_KEY = 'tutor-current'
 /** 我方 participant identity(后端签 token 时写死),转录按身份区分左右气泡 */
 const MY_IDENTITY = 'max'
 /** 前端版本号:每次改前端手动 +1,页脚展示,用于核对线上是否为最新部署 */
-const APP_VERSION = 'v15'
+const APP_VERSION = 'v16'
 /** 挂断自动保存的最多尝试次数 */
 const SAVE_ATTEMPTS = 3
 /** 新纠错提示在视频上停留的毫秒数 */

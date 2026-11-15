@@ -9,7 +9,7 @@ import type { UnitBrief } from './units'
  */
 
 /** 后端地址:k3s Traefik 入口的 HTTPS 域名。sslip.io 规则:IP 1.2.3.4 → 1-2-3-4.sslip.io */
-export const API_BASE = site.tutor.api
+export const API_BASE = site.api
 
 /** GitHub 账号:token 是 PAT(用于向后端换取/续期 JWT) */
 export type Account = { user: string; token: string }

@@ -32,8 +32,8 @@ PUBLIC_API = f"https://www.duolingo.com/2017-06-30/users?username={USERNAME}"
 AUTH_API = f"https://www.duolingo.com/2017-06-30/users/{USER_ID}"
 SUMMARY_API = f"https://www.duolingo.com/2017-06-30/users/{USER_ID}/xp_summaries"
 SUMMARY_DAYS = 45  # 每次回看多少天的 xp_summaries(合并只增不减,窗口只需覆盖可能被回填的近期)
-# 文件模式(GitHub Actions / 本地)写仓库根的 data/,须从仓库根目录运行;
-# 数据库模式(k3s CronJob)由 collect.py 把 OUT 指到临时文件,再把结果存进 PostgreSQL。
+# 正式跑法是数据库模式:k3s CronJob 经 collect.py 把 OUT 指到临时文件,再把结果存进 PostgreSQL。
+# 直接运行本文件是文件模式(本地调试):读写当前目录下的 data/。
 OUT = Path("data") / "duolingo-history.json"
 
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
